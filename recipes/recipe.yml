@@ -21,13 +21,13 @@ modules:
     repos:
       cleanup: true
       files:
-        - https://download.opensuse.org/repositories/home:TheLocehiliosan:yadm/Fedora_%OS_VERSION%/home:TheLocehiliosan:yadm.repo # Yadm from OpenSUSE OBS
         - https://repo.nordvpn.com/yum/nordvpn/centos/x86_64
         - https://pkgs.tailscale.com/stable/fedora/tailscale.repo
         - https://pkgs.netbird.io/yum/
         - https://mega.nz/linux/repo/Fedora_%OS_VERSION%/
       copr:
         - fptbb/fp-os-meta
+        - jloehel/yadm
         - bigjapka/VeraCrypt
         - psygreg/linuxtoys
         - zeno/scrcpy
