@@ -1,13 +1,13 @@
 ---
 # yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
 # image will be published to ghcr.io/<user>/<name>
-name: template
+name: fp-os-next
 # description will be included in the image's metadata
-description: This is my personal OS image.
+description: A custom image of Bazzite for personal needs.
 
 # the base image to build on top of (FROM) and the version tag to use
-base-image: ghcr.io/ublue-os/silverblue-main
-image-version: 42 # latest is also supported if you want new updates ASAP
+base-image: ghcr.io/ublue-os/bazzite-dx-nvidia
+image-version: latest # latest is also supported if you want new updates ASAP
 
 # module configuration, executed in order
 # you can include multiple instances of the same module
@@ -19,12 +19,33 @@ modules:
 
   - type: dnf
     repos:
+      cleanup: true
+      files:
+        - https://download.opensuse.org/repositories/home:TheLocehiliosan:yadm/Fedora_%OS_VERSION%/home:TheLocehiliosan:yadm.repo # Yadm from OpenSUSE OBS
+        - https://repo.nordvpn.com/yum/nordvpn/centos/x86_64
+        - https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+        - https://pkgs.netbird.io/yum/
+        - https://mega.nz/linux/repo/Fedora_%OS_VERSION%/
       copr:
-        - atim/starship
+        - fptbb/fp-os-meta
+        - bigjapka/VeraCrypt
+        - psygreg/linuxtoys
+        - zeno/scrcpy
+      keys:
+        - https://repo.nordvpn.com/gpg/nordvpn_public.asc
+        - https://pkgs.netbird.io/yum/repodata/repomd.xml.key
+        - https://mega.nz/linux/repo/Fedora_%OS_VERSION%/repodata/repomd.xml.key
     install:
       packages:
-        - micro
-        - starship
+        - fp-os-meta
+        - yadm
+        - veracrypt
+        - nordvpn
+        - tailscale
+        - netbird
+        - netbird-ui
+        - linuxtoys
+        - scrcpy
     remove:
       packages:
         # example: removing firefox (in favor of the flatpak)
@@ -41,5 +62,14 @@ modules:
           - org.mozilla.firefox
           - org.gnome.Loupe
       - scope: user # Also add Flathub user repo, but no user packages
-
+  - type: systemd
+    system:
+      enabled:
+        - nordvpnd
+        - tailscaled
+        - netbird
+  - type: script
+    scripts:
+      - brand.sh
+  - type: initramfs
   - type: signing # this sets up the proper policy & signing files for signed images to work fully
