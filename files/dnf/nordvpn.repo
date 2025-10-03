@@ -1,6 +1,5 @@
 [nordvpn]
 name=NordVPN
-baseurl=https://repo.nordvpn.com/yum/nordvpn/centos/${basearch}/
+baseurl=https://repo.nordvpn.com/yum/nordvpn/centos/$basearch/
 gpgkey=https://repo.nordvpn.com/gpg/nordvpn_public.asc
 gpgcheck=1
-EOF

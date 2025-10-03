@@ -22,9 +22,9 @@ modules:
       cleanup: true
       files:
         - nordvpn.repo
-        - https://pkgs.tailscale.com/stable/fedora/tailscale.repo
-        - https://pkgs.netbird.io/yum/
-        - https://mega.nz/linux/repo/Fedora_%OS_VERSION%/
+        - tailscale.repo
+        - netbird.repo
+        - megasync.repo
       copr:
         - fptbb/fp-os-meta
         - jloehel/yadm
