@@ -21,7 +21,7 @@ modules:
     repos:
       cleanup: true
       files:
-        - https://repo.nordvpn.com/yum/nordvpn/centos/x86_64
+        - nordvpn.repo
         - https://pkgs.tailscale.com/stable/fedora/tailscale.repo
         - https://pkgs.netbird.io/yum/
         - https://mega.nz/linux/repo/Fedora_%OS_VERSION%/
