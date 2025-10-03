@@ -31,7 +31,7 @@ jobs:
     steps:
       # the build is fully handled by the reusable github action
       - name: Maximize build space
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        uses: ublue-os/container-storage-action@main
       - name: Build Custom Image
         uses: blue-build/github-action@v1.9
         with:
