@@ -101,8 +101,11 @@ modules:
         - nordvpnd
         - tailscaled
         - netbird
-  - type: script
-    scripts:
-      - brand.sh
+  - type: os-release
+    properties:
+      ID: fp_os
+      NAME: Fp OS
+      PRETTY_NAME: Fp OS
+      HOME_URL: https://os.fpt.icu
   - type: initramfs
   - type: signing # this sets up the proper policy & signing files for signed images to work fully
