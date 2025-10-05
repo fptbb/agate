@@ -1,0 +1,41 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: dnf
+    repos:
+      cleanup: true
+      copr:
+        - fptbb/fp-os-meta
+        - jloehel/yadm
+        - bigjapka/VeraCrypt
+        - psygreg/linuxtoys
+        - zeno/scrcpy
+      files:
+        - nordvpn.repo
+        - tailscale.repo
+        - netbird.repo
+      keys:
+        - https://repo.nordvpn.com/gpg/nordvpn_public.asc
+        - https://pkgs.netbird.io/yum/repodata/repomd.xml.key
+    install:
+      packages:
+        - fp-os-meta
+        - nordvpn
+        - tailscale
+        - netbird
+        - netbird-ui
+        - yadm
+        - veracrypt
+        - linuxtoys
+        - scrcpy
+    remove:
+      packages:
+        - firefox
+        - firefox-langpacks
+  - type: systemd
+    system:
+      enabled:
+        - nordvpnd
+        - tailscaled
+        - netbird

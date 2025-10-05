@@ -1,0 +1,45 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/module-v1.json
+
+type: default-flatpaks
+configurations:
+  - notify: true # Send notification after install/uninstall is finished (true/false)
+    scope: system
+    # If no repo information is specified, Flathub will be used by default
+    install: # system flatpaks we want all users to have and not remove
+      - app.zen_browser.zen
+      - com.bitwarden.desktop
+      - com.dec05eba.gpu_screen_recorder
+      - com.github.Matoking.protontricks
+      - com.github.tchx84.Flatseal
+      - com.heroicgameslauncher.hgl
+      - com.jetpackduba.Gitnuro
+      - com.obsproject.Studio
+      - com.spotify.Client
+      - com.usebottles.bottles
+      - eu.ithz.umftpd
+      - io.github.equicord.equibop
+      - io.github.martinrotter.rssguard
+      - io.github.peazip.PeaZip
+      - io.github.ryubing.Ryujinx
+      - io.mrarm.mcpelauncher
+      - io.podman_desktop.PodmanDesktop
+      - io.qt.QtCreator
+      - it.mijorus.gearlever
+      - md.obsidian.Obsidian
+      - net.epson.epsonscan2
+      - org.audacityteam.Audacity
+      - org.gimp.GIMP
+      - org.gnome.Boxes
+      - org.kde.digikam
+      - org.kde.haruna
+      - org.mozilla.Thunderbird
+      - org.onlyoffice.desktopeditors
+      - org.pipewire.Helvum
+      - org.prismlauncher.PrismLauncher
+      - org.qbittorrent.qBittorrent
+      - org.upnproutercontrol.UPnPRouterControl
+      - org.vinegarhq.Sober
+      - org.vinegarhq.Vinegar
+      - rest.insomnia.Insomnia
+  - scope: user # Also add Flathub user repo, but no user packages

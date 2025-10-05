@@ -1,0 +1,13 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: os-release
+    properties:
+      ID: fp_os
+      VARIANT_ID: fp-os
+      NAME: Fp OS
+      PRETTY_NAME: Fp OS
+      HOME_URL: https://os.fpt.icu
+
+  - type: initramfs
