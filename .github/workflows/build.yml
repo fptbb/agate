@@ -38,7 +38,7 @@ jobs:
           registry_token: ${{ github.token }}
           pr_event_number: ${{ github.event.number }}
           build_opts: --build-driver=podman --run-driver=podman
-          use_cache: true
-          rechunk: false
+          use_cache: false
+          rechunk: true
 
           maximize_build_space: false
