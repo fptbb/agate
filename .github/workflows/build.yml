@@ -39,6 +39,6 @@ jobs:
           pr_event_number: ${{ github.event.number }}
           build_opts: --build-driver=podman --run-driver=podman --skip-validation
           use_cache: false
-          rechunk: true
+          rechunk: false
 
           maximize_build_space: false
