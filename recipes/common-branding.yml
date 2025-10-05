@@ -9,5 +9,6 @@ modules:
       NAME: Fp OS
       PRETTY_NAME: Fp OS
       HOME_URL: https://os.fpt.icu
+      DEFAULT_HOSTNAME: fp-pc
 
   - type: initramfs
