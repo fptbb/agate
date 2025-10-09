@@ -41,4 +41,3 @@ modules:
         - nordvpnd
         - tailscaled
         - netbird
-        - vicinae
