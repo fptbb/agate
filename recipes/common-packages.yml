@@ -11,6 +11,7 @@ modules:
         - bigjapka/VeraCrypt
         - psygreg/linuxtoys
         - zeno/scrcpy
+        - gvalkov/vicinae
       files:
         - nordvpn.repo
         - tailscale.repo
@@ -29,6 +30,7 @@ modules:
         - veracrypt
         - linuxtoys
         - scrcpy
+        - vicinae
     remove:
       packages:
         - firefox
@@ -39,3 +41,4 @@ modules:
         - nordvpnd
         - tailscaled
         - netbird
+        - vicinae
