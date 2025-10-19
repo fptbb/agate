@@ -1,6 +1,6 @@
 # <img src="files/system/usr/share/pixmaps/fp-logo.png" alt="Fp OS Logo" width="45" valign="middle"/> Fp OS
 
-[![Build Status](https://github.com/Fptbb/fp-os/actions/workflows/build.yml/badge.svg)](https://github.com/Fptbb/fp-os/actions/)
+[![Build Status](https://github.com/fptbb/fp-os/actions/workflows/build.yml/badge.svg)](https://github.com/fptbb/fp-os/actions/)
 
 **Website: [os.fpt.icu](https://os.fpt.icu)**
 
@@ -63,7 +63,7 @@ If you want to customize this image or build it yourself, you can use the provid
 ### Build Instructions
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/Fptbb/fp-os.git
+    git clone git@github.com:fptbb/fp-os.git
     cd fp-os
     ```
 2.  **Build the container image:**
