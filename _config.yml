@@ -3,3 +3,5 @@ plugins:
   - jekyll-remote-theme
 title: [Fp OS]
 description: [A custom image of Bazzite for personal needs.]
+minima:
+  skin: dark
