@@ -7,9 +7,9 @@ set -oue pipefail
 
 # Your code goes here.
 IMAGE_INFO="/usr/share/ublue-os/image-info.json"
-IMAGE_REF="ostree-image-signed:docker://ghcr.io/fptbb/fp-os"
+IMAGE_REF="ostree-image-signed:docker://ghcr.io/fptbb/agate"
 
 # image-info File
-sed -i 's/"image-name": [^,]*/"image-name": "'"fp-os"'"/' $IMAGE_INFO
+sed -i 's/"image-name": [^,]*/"image-name": "'"agate"'"/' $IMAGE_INFO
 sed -i 's/"image-vendor": [^,]*/"image-vendor": "'"fptbb"'"/' $IMAGE_INFO
 sed -i 's|"image-ref": [^,]*|"image-ref": "'"$IMAGE_REF"'"|' $IMAGE_INFO

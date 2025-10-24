@@ -1,6 +1,6 @@
-# <img src="files/system/usr/share/pixmaps/fp-logo.png" alt="Fp OS Logo" width="45" valign="middle"/> Fp OS
+# <img src="files/system/usr/share/pixmaps/fp-logo.png" alt="Agate Logo" width="45" valign="middle"/> Agate
 
-[![Build Status](https://github.com/fptbb/fp-os/actions/workflows/build.yml/badge.svg)](https://github.com/fptbb/fp-os/actions/)
+[![Build Status](https://github.com/fptbb/agate/actions/workflows/build.yml/badge.svg)](https://github.com/fptbb/agate/actions/)
 
 **Website: [os.fpt.icu](https://os.fpt.icu)**
 
@@ -8,7 +8,7 @@
 
 ## Introduction
 
-Welcome to Fp OS! This project is a customized, bootable OS image based on [Bazzite](https://bazzite.gg/) (a Fedora KDE variant), built using the [BlueBuild](https://blue-build.org/).
+Welcome to Agate! This project is a customized, bootable OS image based on [Bazzite](https://bazzite.gg/) (a Fedora KDE variant), built using the [BlueBuild](https://blue-build.org/).
 
 While this is my personal daily driver OS, tailored to my specific workflow and preferences, it's also publicly available as a learning resource or a starting point for your own custom OS image. You can see how certain customizations are made, fork the project to suit your needs, or just draw inspiration for your own builds.
 
@@ -23,13 +23,12 @@ While this is my personal daily driver OS, tailored to my specific workflow and 
 
 ## Features & Customizations
 
-Here's a summary of what makes Fp OS unique:
+Here's a summary of what makes Agate unique:
 
 ### Branding
-*   **KDE "About System":** Displays "Fp OS - Bazzite Edition" with a custom logo and a link to the project website (configured in `system_files/etc/xdg/kcm-about-distrorc`).
 *   **Wallpapers:** Custom default desktop and lockscreen wallpapers are included.
 *   **MOTD:** A custom "Message of the Day" is shown in the terminal.
-*   **OS Info:** The `/usr/lib/os-release` file is updated with Fp OS branding.
+*   **OS Info:** The `/usr/lib/os-release` file is updated with Agate branding.
 
 ### System-Level Changes & Additions
 *   **Google Account Fix:** The KDE Google Account provider is modified to improve Google Drive integration.
@@ -48,7 +47,7 @@ You can switch an existing `bootc`-compatible system (like Fedora, Bazzite, or B
 
 **Rebase Command:**
 ```bash
-sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/fptbb/fp-os:latest
+sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/fptbb/agate:latest
 ```
 After the command completes, reboot your system. You can check the status at any time with `sudo bootc status`.
 
@@ -63,7 +62,7 @@ If you want to customize this image or build it yourself, you can use the provid
 ### Build Instructions
 1.  **Clone the repository:**
     ```bash
-    git clone git@github.com:fptbb/fp-os.git
+    git clone git@github.com:fptbb/agate.git
     cd fp-os
     ```
 2.  **Build the container image:**
@@ -83,8 +82,15 @@ If you want to customize this image or build it yourself, you can use the provid
 These images are signed with [Sigstore](https://www.sigstore.dev/)'s [cosign](https://github.com/sigstore/cosign). You can verify the signature by downloading the `cosign.pub` file from this repo and running the following command:
 
 ```bash
-cosign verify --key cosign.pub ghcr.io/fptbb/fp-os
+cosign verify --key cosign.pub ghcr.io/fptbb/agate
 ```
+
+## Name Meaning
+Many Fedora Atomic Desktops are named after minerals and rocks—often silicates like kinoite or onyx (and even bazzite), evoking the durable, crystalline foundations of these immutable systems. In that spirit, I've named this Bazzite-based image after **Red Fox Agate**, a rare variety of chalcedony quartz whose vibrant orange-red bands, streaked with white, mimic the fur of a red fox.
+
+Sourced exclusively from ancient volcanic geodes in Patagonia, Argentina (notably the Cerro Cristal region near Perito Moreno), Red Fox Agate was first discovered in 1997. Its botryoidal hematite inclusions create that signature "foxy" pattern, with a Mohs hardness of 6.5–7 making it ideal for polished cabochons, jewelry, or display specimens.
+
+For more on this gem: [Red Fox Agate Overview](https://www.geologyin.com/2023/11/red-fox-agate.html)
 
 ## Acknowledgements
 

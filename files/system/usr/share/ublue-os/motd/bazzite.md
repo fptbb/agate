@@ -1,4 +1,4 @@
-# Welcome to Fp OS Bazzite Edition 󰊴
+# Welcome to Agate Bazzite Edition 󰊴
 󱋩 `%IMAGE_NAME%:%IMAGE_BRANCH%`
  This is an image by Fptbb
 

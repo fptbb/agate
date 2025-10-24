@@ -27,4 +27,4 @@ build:
 build-iso:
     #!/usr/bin/bash
     echo "Building image iso..."
-    sudo bluebuild generate-iso --iso-name fp-os.iso recipe recipes/recipe.yml
+    sudo bluebuild generate-iso --iso-name agate.iso recipe recipes/recipe.yml

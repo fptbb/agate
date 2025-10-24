@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
-name: fp-os
+name: agate
 description: A custom image of Bazzite for personal needs.
 
 base-image: ghcr.io/ublue-os/bazzite-dx-nvidia

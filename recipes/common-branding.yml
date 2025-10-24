@@ -4,10 +4,10 @@
 modules:
   - type: os-release
     properties:
-      ID: fp-os
-      VARIANT_ID: fp-os
-      NAME: Fp OS
-      PRETTY_NAME: Fp OS
+      ID: agate
+      VARIANT_ID: agate
+      NAME: Agate
+      PRETTY_NAME: Agate
       HOME_URL: https://os.fpt.icu
       DEFAULT_HOSTNAME: fp-pc
   - type: script
