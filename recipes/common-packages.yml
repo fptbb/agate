@@ -15,7 +15,7 @@ modules:
         # - nordvpn.repo
         - tailscale.repo
       keys:
-        # - https://repo.nordvpn.com/gpg/nordvpn_public.asc
+        - https://repo.nordvpn.com/gpg/nordvpn_public.asc
     install:
       skip-unavailable: true
       skip-broken: true
