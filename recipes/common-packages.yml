@@ -9,7 +9,7 @@ modules:
         - fptbb/fp-os-meta
         - jloehel/yadm
         - bigjapka/VeraCrypt
-        # - psygreg/linuxtoys
+        - psygreg/linuxtoys
         - zeno/scrcpy
         - gvalkov/vicinae
       files:
@@ -28,7 +28,7 @@ modules:
         - netbird-ui
         - yadm
         - veracrypt
-        # - linuxtoys
+        - linuxtoys
         - scrcpy
         - vicinae
     remove:
