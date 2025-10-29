@@ -11,6 +11,7 @@ modules:
         - bigjapka/VeraCrypt
         - psygreg/linuxtoys
         - zeno/scrcpy
+        - kdesig/kde-final
       files:
         - nordvpn.repo
         - tailscale.repo
