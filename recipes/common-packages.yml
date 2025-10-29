@@ -14,10 +14,8 @@ modules:
       files:
         # - nordvpn.repo
         - tailscale.repo
-        - netbird.repo
       keys:
         # - https://repo.nordvpn.com/gpg/nordvpn_public.asc
-        - https://pkgs.netbird.io/yum/repodata/repomd.xml.key
     install:
       skip-unavailable: true
       skip-broken: true
@@ -25,8 +23,6 @@ modules:
         - fp-os-meta
         # - nordvpn
         - tailscale
-        - netbird
-        - netbird-ui
         - yadm
         - veracrypt
         - linuxtoys
@@ -39,4 +35,3 @@ modules:
       enabled:
         # - nordvpnd
         - tailscaled
-        - netbird
