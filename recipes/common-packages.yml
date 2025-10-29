@@ -37,6 +37,6 @@ modules:
   - type: systemd
     system:
       enabled:
-        - nordvpnd
+        # - nordvpnd
         - tailscaled
         - netbird
