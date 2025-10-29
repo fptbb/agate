@@ -12,7 +12,7 @@ modules:
         - psygreg/linuxtoys
         - zeno/scrcpy
       files:
-        # - nordvpn.repo
+        - nordvpn.repo
         - tailscale.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
@@ -21,7 +21,7 @@ modules:
       skip-broken: true
       packages:
         - fp-os-meta
-        # - nordvpn
+        - nordvpn
         - tailscale
         - yadm
         - veracrypt
@@ -33,5 +33,5 @@ modules:
   - type: systemd
     system:
       enabled:
-        # - nordvpnd
+        - nordvpnd
         - tailscaled
