@@ -19,7 +19,7 @@ modules:
           - com.spotify.Client
           - com.usebottles.bottles
           - eu.ithz.umftpd
-          - io.github.equicord.equibop
+          - org.equicord.equibop
           - io.github.martinrotter.rssguard
           - io.github.peazip.PeaZip
           - io.github.ryubing.Ryujinx
