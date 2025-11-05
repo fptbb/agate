@@ -34,6 +34,7 @@ Here's a summary of what makes Agate unique:
 *   **Google Account Fix:** The KDE Google Account provider is modified to improve Google Drive integration.
 *   **Enabled Services:** The following services are enabled by default: `nordvpnd`, `tailscaled`, `netbird`, and `podman.socket`.
 *   **Disabled Services:** `NetworkManager-wait-online.service` is disabled to speed up boot times.
+*   **Nix Pkgs Manager:** Nix Pkgs are ready to be installed using `just agate-nixpkgs`.
 
 ### Included RPM Packages
 In addition to the standard Bazzite set, a variety of packages are installed for development (VS Code, Go, buildah), networking (NordVPN, Tailscale, Netbird), system utilities (yadm, kitty, zsh), and many more.
