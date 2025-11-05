@@ -5,3 +5,7 @@ modules:
   - type: script
     scripts:
       - nix.sh
+  - type: justfiles
+    validate: true
+    include:
+        - nix.just
