@@ -52,7 +52,7 @@ sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/fptbb/agate:latest
 ```
 or
 ```bash
-sudo rpm-ostree rebase ostree-image-signed:docker://registry.gitlab.com/fpsys/agate/origami:latest
+sudo rpm-ostree rebase ostree-image-signed:docker://registry.gitlab.com/fpsys/agate:latest
 ```
 After the command completes, reboot your system. You can check the status at any time with `sudo bootc status`.
 
