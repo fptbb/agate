@@ -40,4 +40,4 @@ build-image:
     - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
   script:
     - sleep 5 # Wait a bit for the docker-in-docker service to start
-    - bluebuild build --verbose --rechunk --cache-layers --compression-format zstd --push ./recipes/$RECIPE
+    - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
