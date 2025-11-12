@@ -10,7 +10,6 @@ modules:
         - jloehel/yadm
         - bigjapka/VeraCrypt
         - psygreg/linuxtoys
-        - zeno/scrcpy
       files:
         - nordvpn.repo
         - tailscale.repo
@@ -26,10 +25,6 @@ modules:
         - yadm
         - veracrypt
         - linuxtoys
-        - scrcpy
-    remove:
-      packages:
-        - firefox
   - type: systemd
     system:
       enabled:
