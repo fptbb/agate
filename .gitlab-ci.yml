@@ -38,8 +38,8 @@ build-image:
     # Pulls secure files into the build
     - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
     - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
-    - docker login quay.io -u $BB_USERNAME -p $BB_PASSWORD
+    - docker login $BB_REGISTRY -u $BB_USERNAME -p $BB_PASSWORD
   script:
     - sleep 5 # Wait a bit for the docker-in-docker service to start
-    - echo "Pushing to $BB_REGISTRY_NAMESPACE/agate"
+    - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/agate"
     - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
