@@ -19,3 +19,11 @@ modules:
   - from-file: common-development.yml
 
   - type: signing
+labels:
+  "org.opencontainers.image.title": "Agate"
+  "org.opencontainers.image.source": "https://os.fpt.icu/"
+  "org.opencontainers.image.url": "https://os.fpt.icu/"
+  "org.opencontainers.image.description": "A custom image of Bazzite for personal needs."
+  "org.opencontainers.image.vendor": "fptbb"
+  "io.artifacthub.package.readme-url": "https://raw.githubusercontent.com/fptbb/agate/refs/heads/main/README.md"
+  "io.artifacthub.package.logo-url": "https://raw.githubusercontent.com/fptbb/agate/main/files/system/usr/share/pixmaps/fp-logo.png"
