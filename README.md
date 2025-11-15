@@ -23,13 +23,6 @@ While this is my personal daily driver OS, tailored to my specific workflow and 
 
 ## Features & Customizations
 
-Here's a summary of what makes Agate unique:
-
-### Branding
-*   **Wallpapers:** Custom default desktop and lockscreen wallpapers are included.
-*   **MOTD:** A custom "Message of the Day" is shown in the terminal.
-*   **OS Info:** The `/usr/lib/os-release` file is updated with Agate branding.
-
 ### System-Level Changes & Additions
 *   **Google Account Fix:** The KDE Google Account provider is modified to improve Google Drive integration.
 *   **Enabled Services:** The following services are enabled by default: `nordvpnd`, `tailscaled`, `netbird`, and `podman.socket`.
