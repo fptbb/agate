@@ -25,8 +25,12 @@ modules:
         - yadm
         - veracrypt
         - linuxtoys
+  - type: script
+    scripts:
+      - whatpulse.sh
   - type: systemd
     system:
       enabled:
         - nordvpnd
         - tailscaled
+        - whatpulse-pcap-service
