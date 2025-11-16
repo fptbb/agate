@@ -3,3 +3,4 @@ cosign.private
 /Containerfile
 /.bluebuild-scripts_*
 /*.iso*
+/files/scripts/*.rpm
