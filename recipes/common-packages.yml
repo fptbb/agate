@@ -33,4 +33,4 @@ modules:
       enabled:
         - nordvpnd
         - tailscaled
-        - whatpulse-pcap-service
+        # - whatpulse-pcap-service
