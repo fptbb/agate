@@ -13,7 +13,5 @@ log "Build whatpulse service."
 git clone https://github.com/whatpulse/linux-external-pcap-service.git
 cd ./linux-external-pcap-service
 make
-chmod +755 ./whatpulse-pcap-service
-chmod +644 ./whatpulse-pcap-service-manual.service
-cp ./whatpulse-pcap-service /usr/bin/whatpulse-pcap-service
-cp ./whatpulse-pcap-service.service /lib/systemd/system/whatpulse-pcap-service.service
+install -m 755 ./whatpulse-pcap-service /usr/bin/whatpulse-pcap-service
+install -m 644 ./whatpulse-pcap-service.service /lib/systemd/system/whatpulse-pcap-service.service
