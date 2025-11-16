@@ -25,6 +25,8 @@ modules:
         - yadm
         - veracrypt
         - linuxtoys
+        - libpcap
+        - libpcap-devel
   - type: script
     scripts:
       - custom-rpm.sh
