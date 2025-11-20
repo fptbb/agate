@@ -16,7 +16,7 @@ mkdir -p /nix && \
 
 log "Hiding nix and git users from sddm."
 
-FILE="/etc/sddm.conf.d/kde_settings.conf"
+FILE="/usr/lib/sddm/sddm.conf.d/kde_settings.conf"
 
 # Create file if it doesn't exist
 touch "$FILE"
