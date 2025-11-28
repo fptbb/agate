@@ -8,6 +8,8 @@ log() {
   echo "=== $* ==="
 }
 
+ln -s /usr/lib64/libpcap.so /usr/lib/libpcap.so.0.8
+
 # log "Build whatpulse service."
 
 # git clone https://github.com/whatpulse/linux-external-pcap-service.git
