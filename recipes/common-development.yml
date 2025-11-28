@@ -8,4 +8,4 @@ modules:
   - type: justfiles
     validate: true
     include:
-        - nix.just
+        - development.just
