@@ -13,8 +13,10 @@ modules:
       files:
         - nordvpn.repo
         - tailscale.repo
+        - cloudflare-warp.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
+        - https://pkg.cloudflareclient.com/pubkey.gpg
     install:
       skip-unavailable: true
       skip-broken: true
@@ -24,6 +26,7 @@ modules:
         - tailscale
         - yadm
         - veracrypt
+        - cloudflare-warp
         - linuxtoys
   - type: script
     scripts:
