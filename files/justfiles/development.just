@@ -3,6 +3,7 @@
 agate-nixpkgs:
     #!/usr/bin/bash
     /nix/nix-installer
+
 # Install DevBox
 [group("system")]
 agate-devbox:

@@ -28,6 +28,7 @@ build-iso:
     #!/usr/bin/bash
     echo "Building image iso..."
     sudo bluebuild generate-iso --iso-name agate.iso recipe recipes/recipe.yml
+
 build-iso-online:
     #!/usr/bin/bash
     echo "Building image iso based on online image..."
