@@ -30,10 +30,9 @@ modules:
         - linuxtoys
   - type: script
     scripts:
-      - whatpulse.sh
+      - install-portmaster.sh
   - type: systemd
     system:
       enabled:
         - nordvpnd
         - tailscaled
-        # - whatpulse-pcap-service

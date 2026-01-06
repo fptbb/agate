@@ -6,3 +6,12 @@ modules:
     fonts:
       nerd-fonts:
         - NerdFontsSymbolsOnly
+  - type: script
+    scripts:
+      - branding.sh
+      - os-birthday.sh
+
+  - type: systemd
+    system:
+      enabled:
+        - os-birthday

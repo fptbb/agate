@@ -48,6 +48,11 @@
       "type": "uptime",
       "key": " 󰅐",
     },
+    {
+      "type": "command",
+      "key": " ",
+      "text": "sh -c 'f=/var/lib/os-birthday.timestamp; [ -r \"$f\" ] || exit 0; b=$(date -d \"$(cat \\\"$f\\\")\" +%s); n=$(date +%s); d=$(( (n-b)/86400 )); h=$(( ((n-b)%86400)/3600 )); printf \"%s (%dd %dh)\" \"$(date -d \"@$b\" +%F)\" \"$d\" \"$h\"'"
+    },
     "break",
     {
       "type": "host",

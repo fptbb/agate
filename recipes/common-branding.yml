@@ -10,8 +10,5 @@ modules:
       PRETTY_NAME: Agate
       HOME_URL: https://os.fpt.icu
       DEFAULT_HOSTNAME: fp-pc
-  - type: script
-    scripts:
-      - branding.sh
 
   - type: initramfs
