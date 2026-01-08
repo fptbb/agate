@@ -28,6 +28,8 @@ modules:
         - veracrypt
         - cloudflare-warp
         - linuxtoys
+        - gcc-c++
+        - libpcap-devel
   - type: script
     scripts:
       - whatpulse.sh

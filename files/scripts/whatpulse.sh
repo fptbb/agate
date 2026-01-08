@@ -15,16 +15,20 @@ log "Install whatpulse service."
 # Create a temporary directory
 TEMP_DIR=$(mktemp -d)
 
-# Fetch the latest RPM URL
-LATEST_URL=$(curl -s https://api.github.com/repos/whatpulse/linux-external-pcap-service/releases/latest | grep "browser_download_url" | grep "rpm" | cut -d '"' -f 4)
+# Fetch the latest source URL
+LATEST_URL=$(curl -s https://api.github.com/repos/whatpulse/linux-external-pcap-service/releases/latest | grep "browser_download_url" | grep ".tar.gz" | cut -d '"' -f 4)
 
 log "Downloading from: $LATEST_URL"
 
-# Download the RPM to the temporary directory
-curl -L -o "$TEMP_DIR/whatpulse-pcap-service.rpm" "$LATEST_URL"
+# Download the source
+curl -L -o "$TEMP_DIR/whatpulse-pcap-service.tar.gz" "$LATEST_URL"
 
-# Install the RPM
-dnf install "$TEMP_DIR/whatpulse-pcap-service.rpm"
+# Extract and Install
+tar xzf "$TEMP_DIR/whatpulse-pcap-service.tar.gz"
+cd "$TEMP_DIR/whatpulse-pcap-service-*"
+
+make
+make install
 
 # Clean up the temporary directory
 rm -rf "$TEMP_DIR"
