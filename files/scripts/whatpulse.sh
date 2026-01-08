@@ -29,7 +29,9 @@ tar xzf "$TEMP_DIR/whatpulse-pcap-service.tar.gz" -C "$TEMP_DIR/whatpulse-pcap-s
 cd "$TEMP_DIR/whatpulse-pcap-service"
 
 make
-make install
+
+install -m 755 whatpulse-pcap-service /usr/bin/
+install -m 644 whatpulse-pcap-service.service /etc/systemd/system/whatpulse-pcap-service.service
 
 # Clean up the temporary directory
 rm -rf "$TEMP_DIR"
