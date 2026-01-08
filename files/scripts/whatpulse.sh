@@ -24,7 +24,8 @@ log "Downloading from: $LATEST_URL"
 curl -L -o "$TEMP_DIR/whatpulse-pcap-service.tar.gz" "$LATEST_URL"
 
 # Extract and Install
-tar xzf "$TEMP_DIR/whatpulse-pcap-service.tar.gz"
+mkdir "$TEMP_DIR/whatpulse-pcap-service"
+tar xzf "$TEMP_DIR/whatpulse-pcap-service.tar.gz" -C "$TEMP_DIR/whatpulse-pcap-service"
 cd "$TEMP_DIR/whatpulse-pcap-service"
 
 make
