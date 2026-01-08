@@ -24,9 +24,7 @@ log "Downloading from: $LATEST_URL"
 curl -L -o "$TEMP_DIR/whatpulse-pcap-service.rpm" "$LATEST_URL"
 
 # Install the RPM
-# Note: Using rpm-ostree because this is an Atomic image build.
-# 'dnf' generally does not work for layering inside these container builds.
-rpm-ostree install "$TEMP_DIR/whatpulse-pcap-service.rpm"
+dnf install "$TEMP_DIR/whatpulse-pcap-service.rpm"
 
 # Clean up the temporary directory
 rm -rf "$TEMP_DIR"
