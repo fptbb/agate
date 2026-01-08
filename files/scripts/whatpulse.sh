@@ -25,7 +25,7 @@ curl -L -o "$TEMP_DIR/whatpulse-pcap-service.tar.gz" "$LATEST_URL"
 
 # Extract and Install
 tar xzf "$TEMP_DIR/whatpulse-pcap-service.tar.gz"
-cd "$TEMP_DIR/whatpulse-pcap-service-*"
+cd "$TEMP_DIR/whatpulse-pcap-service"
 
 make
 make install
