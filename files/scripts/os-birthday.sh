@@ -13,6 +13,8 @@ UNIT_PATH="/usr/lib/systemd/system/os-birthday.service"
 cat > "$UNIT_PATH" <<'EOF'
 [Unit]
 Description=Create system installation timestamp
+RequiresMountsFor=/var
+After=var.mount
 ConditionPathExists=!/var/lib/os-birthday.timestamp
 
 [Service]
