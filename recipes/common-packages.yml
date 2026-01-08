@@ -28,6 +28,9 @@ modules:
         - veracrypt
         - cloudflare-warp
         - linuxtoys
+  - type: script
+    scripts:
+      - whatpulse.sh
   - type: systemd
     system:
       enabled:

@@ -10,10 +10,25 @@ log() {
 
 ln -s /usr/lib64/libpcap.so /usr/lib/libpcap.so.0.8
 
-# log "Build whatpulse service."
+log "Install whatpulse service."
 
-# git clone https://github.com/whatpulse/linux-external-pcap-service.git
-# cd ./linux-external-pcap-service
-# make
-# install -m 755 ./whatpulse-pcap-service /usr/bin/whatpulse-pcap-service
-# install -m 644 ./whatpulse-pcap-service.service /lib/systemd/system/whatpulse-pcap-service.service
+# Create a temporary directory
+TEMP_DIR=$(mktemp -d)
+
+# Fetch the latest RPM URL
+LATEST_URL=$(curl -s https://api.github.com/repos/whatpulse/linux-external-pcap-service/releases/latest | grep "browser_download_url" | grep "rpm" | cut -d '"' -f 4)
+
+log "Downloading from: $LATEST_URL"
+
+# Download the RPM to the temporary directory
+curl -L -o "$TEMP_DIR/whatpulse-pcap-service.rpm" "$LATEST_URL"
+
+# Install the RPM
+# Note: Using rpm-ostree because this is an Atomic image build.
+# 'dnf' generally does not work for layering inside these container builds.
+rpm-ostree install "$TEMP_DIR/whatpulse-pcap-service.rpm"
+
+# Clean up the temporary directory
+rm -rf "$TEMP_DIR"
+
+log "Installation complete."
