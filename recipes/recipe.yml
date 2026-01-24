@@ -28,7 +28,7 @@ labels:
   "org.opencontainers.image.vendor": "fptbb"
   "io.artifacthub.package.readme-url": "https://raw.githubusercontent.com/fptbb/agate/refs/heads/main/README.md"
   "io.artifacthub.package.logo-url": "https://raw.githubusercontent.com/fptbb/agate/main/files/system/usr/share/pixmaps/fp-logo.png"
-  "io.artifacthub.package.maintainers": '[{"name": "fptbb", "email": "lucas@fptbb.com"}]'
+  "io.artifacthub.package.maintainers": '[{\"name\": \"fptbb\", \"email\": \"lucas@fptbb.com\"}]'
   "io.artifacthub.package.prerelease": "false"
   "io.artifacthub.package.keywords": "fp-os, bootc, ostree, ublue, universal-blue, blue-build, agate"
   "io.artifacthub.package.deprecated": "false"
