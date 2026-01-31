@@ -1,6 +1,7 @@
 # <img src="files/system/usr/share/pixmaps/fp-logo.png" alt="Agate Logo" width="45" valign="middle"/> Agate
 
-[![Build Status](https://github.com/fptbb/agate/actions/workflows/build.yml/badge.svg)](https://github.com/fptbb/agate/actions/)
+[![Build Status](https://gitlab.com/fpsys/agate/badges/main/pipeline.svg?ignore_skipped=true&key_text=CI%20Pipeline)](https://gitlab.com/fpsys/agate/-/pipelines)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate)](https://artifacthub.io/packages/search?repo=agate)
 
 **Website: [os.fpt.icu](https://os.fpt.icu)**
 
