@@ -51,7 +51,7 @@
 		{
 			"type": "command",
 			"key": " ",
-			"text": "date -d$(ls -alct /var/log --time-style=full-iso|tail -1|awk '{print $6}') +'Born on %b %d %G'",
+			"text": "date -d$(ls -alct /var/log --time-style=full-iso|tail -1|awk '{print $6}') +'Installed on %b %d %G'",
 			"shell": "/bin/bash"
 		},
 		"break",

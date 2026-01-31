@@ -44,10 +44,6 @@ You can switch an existing `bootc`-compatible system (like Fedora, Bazzite, or B
 ```bash
 sudo rpm-ostree rebase ostree-image-signed:docker://quay.io/fptbb/agate:latest
 ```
-or
-```bash
-sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/fptbb/agate:latest
-```
 After the command completes, reboot your system. You can check the status at any time with `sudo bootc status`.
 
 ## Building from Source
