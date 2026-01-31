@@ -88,7 +88,6 @@ cleanup-old-tags:
               self.token = self.get_auth_token()
               self.session.headers.update({
                   "Authorization": f"Bearer {self.token}",
-                  # Accept both standard Docker manifests and OCI artifacts (important for .sig)
                   "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"
               })
 
@@ -125,23 +124,18 @@ cleanup-old-tags:
 
           def parse_date(self, date_str):
               try:
-                  # Handle fractional seconds and Z
                   date_str = date_str.replace("Z", "+00:00")
-                  # Truncate fractional seconds if python < 3.11 struggles (simple fix)
+                  # Truncate fractional seconds for compatibility
                   if "." in date_str and "+" in date_str:
                       main, tz = date_str.split("+")
-                      main = main[:26] # Truncate to microseconds
+                      main = main[:26]
                       date_str = f"{main}+{tz}"
                   return datetime.fromisoformat(date_str)
               except:
                   return None
 
           def get_tag_metadata(self, tag):
-              """
-              Robustly finds a date for the tag using 3 strategies.
-              """
               try:
-                  # 1. Fetch Manifest
                   man_resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{tag}")
                   if man_resp.status_code != 200: return None
                   
@@ -149,13 +143,12 @@ cleanup-old-tags:
                   digest = man_resp.headers.get("Docker-Content-Digest")
                   dt = None
 
-                  # STRATEGY A: Check OCI Annotations (Common in .sig/artifacts)
+                  # 1. Annotations (Newer OCI/Cosign)
                   if "annotations" in manifest:
                       created = manifest["annotations"].get("org.opencontainers.image.created")
-                      if created:
-                          dt = self.parse_date(created)
+                      if created: dt = self.parse_date(created)
 
-                  # STRATEGY B: Check Config Blob (Standard Images)
+                  # 2. Config Blob (Standard Docker)
                   if not dt and "config" in manifest:
                       config_digest = manifest["config"].get("digest")
                       if config_digest:
@@ -163,7 +156,7 @@ cleanup-old-tags:
                           if blob_resp.status_code == 200:
                               dt = self.parse_date(blob_resp.json().get("created"))
 
-                  # STRATEGY C: Check V1 Compatibility History (Legacy/Older Images)
+                  # 3. V1 Compatibility (Legacy)
                   if not dt and "history" in manifest and len(manifest["history"]) > 0:
                       try:
                           v1_json = json.loads(manifest["history"][0]["v1Compatibility"])
@@ -171,11 +164,12 @@ cleanup-old-tags:
                       except: pass
 
                   if dt:
-                      # Ensure timezone awareness
                       if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
                       return {"name": tag, "date": dt, "digest": digest}
                   
-                  logger.warning(f"Could not find date for tag: {tag} (skipping)")
+                  # If we absolutely cannot find a date, we assume it is old/invalid? 
+                  # Safer to log warning and skip deletion to prevent accidents.
+                  logger.warning(f"Could not find date for tag: {tag} (skipping safety check)")
                   return None
 
               except Exception as e:
@@ -198,6 +192,9 @@ cleanup-old-tags:
               max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
               max_keep = int(os.environ.get("MAX_KEEP", 5))
               
+              # PROTECTED TAGS CONFIGURATION
+              protected_tag_names = ["latest", "latest-cache"]
+              
               logger.info(f"Scanning {self.repo}...")
               tags = self.get_all_tags()
               logger.info(f"Found {len(tags)} tags. Fetching metadata...")
@@ -209,7 +206,8 @@ cleanup-old-tags:
                   meta = self.get_tag_metadata(tag)
                   if meta:
                       tag_data.append(meta)
-                      if tag == "latest":
+                      # If this tag is explicitly protected, save its digest
+                      if tag in protected_tag_names:
                           protected_digests.add(meta["digest"])
 
               # Sort by date (newest first)
@@ -221,25 +219,26 @@ cleanup-old-tags:
                   digest = item["digest"]
                   age_days = (datetime.now(timezone.utc) - item["date"]).days
 
-                  # 1. Protect Latest
-                  if tag == "latest":
-                      logger.info(f"Keeping {tag} (Protected)")
+                  # 1. Check Protected Names
+                  if tag in protected_tag_names:
+                      logger.info(f"Keeping {tag} (Protected Name)")
+                      # We typically count protected tags as "kept" to avoid keeping 5 old ones + 2 protected ones
                       kept_count += 1
                       continue
                   
-                  # 2. Protect Recent Count
+                  # 2. Check Keep Count (Newest N)
                   if kept_count < max_keep:
-                      logger.info(f"Keeping {tag} (Keep Limit)")
+                      logger.info(f"Keeping {tag} (Within keep limit)")
                       protected_digests.add(digest)
                       kept_count += 1
                       continue
 
-                  # 3. Protect Shared Digests
+                  # 3. Check Shared Digests (e.g., tag points to same image as 'latest')
                   if digest in protected_digests:
-                      logger.info(f"Keeping {tag} (Shared Digest)")
+                      logger.info(f"Keeping {tag} (Shared Digest with protected tag)")
                       continue
 
-                  # 4. Check Age
+                  # 4. Expiration Check
                   if age_days > max_age_days:
                       self.delete_tag(tag, digest)
                   else:
