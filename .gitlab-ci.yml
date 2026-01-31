@@ -49,20 +49,18 @@ cleanup-old-tags:
   image: python:3-alpine
   variables:
     IMAGE_NAME: agate
-    # Configuration for the cleanup logic
     MAX_AGE_DAYS: "7"
-    MAX_KEEP: "5"  # Always keep at least the 5 newest tags, even if older than 7 days
-    DRY_RUN: "false" # Set to "true" to test without deleting
+    MAX_KEEP: "5"
+    DRY_RUN: "false"
   script:
     - pip install requests
     - |
       python3 -c '
       import os
       import sys
-      import time
       import logging
       import requests
-      import re
+      import email.utils
       from datetime import datetime, timedelta
 
       # Configure logging
@@ -83,14 +81,12 @@ cleanup-old-tags:
 
               self.base_url = f"https://{self.registry}"
               self.session = requests.Session()
-              # IMPORTANT: Using the Password as a Bearer token (Standard for Quay Robot Accounts)
               self.session.headers.update({
                   "Authorization": f"Bearer {self.token}",
                   "Content-Type": "application/json"
               })
 
           def get_image_tags(self):
-              """Get all tags for the repository"""
               try:
                   url = f"{self.base_url}/api/v1/repository/{self.namespace}/{self.repository}/tag/"
                   params = {"limit": 100, "page": 1}
@@ -115,7 +111,6 @@ cleanup-old-tags:
                   return []
 
           def delete_image_tag(self, tag):
-              """Delete a specific image tag"""
               if self.dry_run:
                   logger.info(f"[DRY RUN] Would delete {tag}")
                   return True
@@ -129,14 +124,30 @@ cleanup-old-tags:
                   logger.error(f"Failed to delete {tag}: {e}")
                   return False
 
-          def parse_timestamp(self, timestamp_str):
-              """Parse Quay timestamp to datetime"""
+          def parse_timestamp(self, timestamp_raw):
+              """Robustly parse timestamp from int, string int, or RFC date string"""
               try:
-                  if isinstance(timestamp_str, (int, float)):
-                      return datetime.fromtimestamp(timestamp_str)
-                  return datetime.fromtimestamp(int(timestamp_str))
-              except (ValueError, TypeError) as e:
-                  logger.warning(f"Failed to parse timestamp: {e}")
+                  # Case 1: Already an int or float (Unix Timestamp)
+                  if isinstance(timestamp_raw, (int, float)):
+                      return datetime.utcfromtimestamp(timestamp_raw)
+
+                  # Case 2: String representing an int (e.g. "1706680000")
+                  try:
+                      return datetime.utcfromtimestamp(int(timestamp_raw))
+                  except ValueError:
+                      pass
+
+                  # Case 3: RFC 2822 Date String (e.g. "Wed, 14 Jan 2026 06:08:06 -0000")
+                  # parsedate_to_datetime handles the email/http format Quay uses
+                  dt = email.utils.parsedate_to_datetime(timestamp_raw)
+
+                  # Ensure it is "naive" UTC (no timezone info) so we can compare with datetime.utcnow()
+                  if dt.tzinfo is not None:
+                      dt = (dt - dt.utcoffset()).replace(tzinfo=None)
+                  return dt
+
+              except Exception as e:
+                  logger.warning(f"Failed to parse timestamp value: {timestamp_raw} ({e})")
                   return None
 
           def run(self):
@@ -148,12 +159,21 @@ cleanup-old-tags:
               tags = self.get_image_tags()
               if not tags: return
 
-              # Sort tags by last_modified (newest first)
-              tags_sorted = sorted(tags, key=lambda t: t.get("last_modified", 0), reverse=True)
+              # Add parsed_date to tags for easier sorting
+              for tag in tags:
+                  tag["parsed_date"] = self.parse_timestamp(tag.get("last_modified"))
+
+              # Sort tags by date (newest first), treating None as very old
+              tags_sorted = sorted(
+                  tags,
+                  key=lambda t: t["parsed_date"] or datetime.min,
+                  reverse=True
+              )
 
               kept_count = 0
               for tag in tags_sorted:
                   tag_name = tag.get("name", "")
+                  tag_date = tag.get("parsed_date")
 
                   # 1. Protection: Always keep "latest"
                   if tag_name == "latest":
@@ -161,21 +181,19 @@ cleanup-old-tags:
                       kept_count += 1
                       continue
 
-                  # 2. Protection: Keep the N newest tags regardless of age
+                  # 2. Protection: Keep the N newest tags
                   if kept_count < max_keep:
                       logger.info(f"Keeping {tag_name} (within max_keep limit)")
                       kept_count += 1
                       continue
 
                   # 3. Age Check
-                  last_modified = tag.get("last_modified")
-                  if last_modified:
-                      tag_date = self.parse_timestamp(last_modified)
-                      if tag_date:
-                          age_days = (datetime.now() - tag_date).days
-                          if age_days > max_age_days:
-                              self.delete_image_tag(tag_name)
-                              continue
+                  if tag_date:
+                      # Use utcnow() to match the naive UTC dates from parse_timestamp
+                      age_days = (datetime.utcnow() - tag_date).days
+                      if age_days > max_age_days:
+                          self.delete_image_tag(tag_name)
+                          continue
 
                   logger.info(f"Keeping {tag_name} (not expired)")
 
