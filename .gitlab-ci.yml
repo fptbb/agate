@@ -61,9 +61,9 @@ cleanup-old-tags:
       import logging
       import requests
       import email.utils
-      from datetime import datetime, timedelta
+      from requests.auth import HTTPBasicAuth
+      from datetime import datetime, timedelta, timezone
 
-      # Configure logging
       logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
       logger = logging.getLogger(__name__)
 
@@ -72,17 +72,21 @@ cleanup-old-tags:
               self.registry = os.environ.get("BB_REGISTRY", "quay.io")
               self.namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
               self.repository = os.environ.get("IMAGE_NAME")
-              self.token = os.environ.get("BB_PASSWORD")
+
+              self.username = os.environ.get("BB_USERNAME")
+              self.password = os.environ.get("BB_PASSWORD")
+
               self.dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
 
-              if not all([self.namespace, self.repository, self.token]):
-                  logger.error("Missing required variables (Namespace, Image Name, or Password).")
+              if not all([self.namespace, self.repository, self.username, self.password]):
+                  logger.error("Missing required variables: BB_REGISTRY_NAMESPACE, IMAGE_NAME, BB_USERNAME, or BB_PASSWORD.")
                   sys.exit(1)
 
               self.base_url = f"https://{self.registry}"
               self.session = requests.Session()
+
+              self.session.auth = HTTPBasicAuth(self.username, self.password)
               self.session.headers.update({
-                  "Authorization": f"Bearer {self.token}",
                   "Content-Type": "application/json"
               })
 
@@ -117,6 +121,11 @@ cleanup-old-tags:
               try:
                   url = f"{self.base_url}/api/v1/repository/{self.namespace}/{self.repository}/tag/{tag}"
                   response = self.session.delete(url, timeout=30)
+
+                  if response.status_code == 403:
+                      logger.error(f"403 Forbidden deleting {tag}. Check Robot Account Permissions for {self.username} on repo {self.namespace}/{self.repository}")
+                      return False
+
                   response.raise_for_status()
                   logger.info(f"Deleted {tag}")
                   return True
@@ -127,23 +136,18 @@ cleanup-old-tags:
           def parse_timestamp(self, timestamp_raw):
               """Robustly parse timestamp from int, string int, or RFC date string"""
               try:
-                  # Case 1: Already an int or float (Unix Timestamp)
                   if isinstance(timestamp_raw, (int, float)):
-                      return datetime.utcfromtimestamp(timestamp_raw)
+                      return datetime.fromtimestamp(timestamp_raw, tz=timezone.utc)
 
-                  # Case 2: String representing an int (e.g. "1706680000")
                   try:
-                      return datetime.utcfromtimestamp(int(timestamp_raw))
+                      return datetime.fromtimestamp(int(timestamp_raw), tz=timezone.utc)
                   except ValueError:
                       pass
 
-                  # Case 3: RFC 2822 Date String (e.g. "Wed, 14 Jan 2026 06:08:06 -0000")
-                  # parsedate_to_datetime handles the email/http format Quay uses
+                  # RFC 2822 parsing (handles "Wed, 14 Jan...")
                   dt = email.utils.parsedate_to_datetime(timestamp_raw)
-
-                  # Ensure it is "naive" UTC (no timezone info) so we can compare with datetime.utcnow()
-                  if dt.tzinfo is not None:
-                      dt = (dt - dt.utcoffset()).replace(tzinfo=None)
+                  if dt.tzinfo is None:
+                      dt = dt.replace(tzinfo=timezone.utc)
                   return dt
 
               except Exception as e:
@@ -159,14 +163,13 @@ cleanup-old-tags:
               tags = self.get_image_tags()
               if not tags: return
 
-              # Add parsed_date to tags for easier sorting
               for tag in tags:
                   tag["parsed_date"] = self.parse_timestamp(tag.get("last_modified"))
 
-              # Sort tags by date (newest first), treating None as very old
+              # Sort tags by date (newest first)
               tags_sorted = sorted(
                   tags,
-                  key=lambda t: t["parsed_date"] or datetime.min,
+                  key=lambda t: t["parsed_date"] or datetime.min.replace(tzinfo=timezone.utc),
                   reverse=True
               )
 
@@ -175,22 +178,18 @@ cleanup-old-tags:
                   tag_name = tag.get("name", "")
                   tag_date = tag.get("parsed_date")
 
-                  # 1. Protection: Always keep "latest"
                   if tag_name == "latest":
                       logger.info(f"Keeping {tag_name} (protected)")
                       kept_count += 1
                       continue
 
-                  # 2. Protection: Keep the N newest tags
                   if kept_count < max_keep:
                       logger.info(f"Keeping {tag_name} (within max_keep limit)")
                       kept_count += 1
                       continue
 
-                  # 3. Age Check
                   if tag_date:
-                      # Use utcnow() to match the naive UTC dates from parse_timestamp
-                      age_days = (datetime.utcnow() - tag_date).days
+                      age_days = (datetime.now(timezone.utc) - tag_date).days
                       if age_days > max_age_days:
                           self.delete_image_tag(tag_name)
                           continue
