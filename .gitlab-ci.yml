@@ -12,6 +12,7 @@ workflow:
 
 stages:
   - build
+  - cleanup
 
 build-image:
   stage: build
@@ -25,7 +26,6 @@ build-image:
   parallel:
     matrix:
       - RECIPE:
-          # Add your recipe files here
           - recipe.yml
   variables:
     # Setup a secure connection with docker-in-docker service
@@ -43,3 +43,71 @@ build-image:
     - sleep 5 # Wait a bit for the docker-in-docker service to start
     - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/agate"
     - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
+
+cleanup-old-tags:
+  stage: cleanup
+  image: python:3-alpine
+  variables:
+    IMAGE_NAME: agate
+  script:
+    - pip install requests
+    - |
+      python3 -c '
+      import os
+      import time
+      import requests
+
+      # ENV
+      registry = os.environ.get("BB_REGISTRY", "quay.io")
+      namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
+      image = os.environ.get("IMAGE_NAME")
+      username = os.environ.get("BB_USERNAME")
+      password = os.environ.get("BB_PASSWORD")
+
+      if not all([namespace, image, username, password]):
+          print("Error: Missing required environment variables (Namespace, Image, User, or Password).")
+          exit(1)
+
+      base_url = f"https://{registry}/api/v1/repository/{namespace}/{image}/tag/"
+      seven_days_ago = time.time() - (7 * 24 * 60 * 60)
+
+      print(f"--- Starting cleanup for {namespace}/{image} ---")
+      print(f"Deleting tags older than: {time.ctime(seven_days_ago)}")
+
+      session = requests.Session()
+      session.auth = (username, password)
+
+      def get_all_tags():
+          page = 1
+          has_more = True
+          while has_more:
+              resp = session.get(base_url, params={"limit": 100, "page": page})
+              if resp.status_code != 200:
+                  print(f"Failed to fetch tags: {resp.status_code} {resp.text}")
+                  break
+
+              data = resp.json()
+              yield from data.get("tags", [])
+
+              has_more = data.get("has_additional", False)
+              page += 1
+
+      for tag in get_all_tags():
+          name = tag.get("name")
+          start_ts = tag.get("start_ts") # Creation timestamp from Quay
+
+          # Never delete latest
+          if name == "latest":
+              continue
+
+          if start_ts and start_ts < seven_days_ago:
+              print(f"Deleting expired tag: {name} (Created: {time.ctime(start_ts)})")
+              del_resp = session.delete(f"{base_url}{name}")
+
+              if del_resp.status_code == 204:
+                  print(f"Successfully deleted {name}")
+              else:
+                  print(f"Failed to delete {name}: {del_resp.status_code}")
+
+      print("--- Cleanup complete ---")
+      '
