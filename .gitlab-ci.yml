@@ -58,139 +58,195 @@ cleanup-old-tags:
       python3 -c '
       import os
       import sys
-      import time
       import logging
       import requests
-      import email.utils
       from datetime import datetime, timezone
+      from requests.auth import HTTPBasicAuth
 
       # Configure logging
       logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
       logger = logging.getLogger(__name__)
 
-      class QuayExpirationSetter:
+      class DockerV2Cleaner:
           def __init__(self):
-              self.registry = os.environ.get("BB_REGISTRY", "quay.io")
-              self.namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
-              self.repository = os.environ.get("IMAGE_NAME")
+              self.registry = "quay.io"
+              # Ensure namespace/image format
+              namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
+              image = os.environ.get("IMAGE_NAME")
+              self.repo = f"{namespace}/{image}"
+              
               self.username = os.environ.get("BB_USERNAME")
-              self.token = os.environ.get("BB_PASSWORD")
+              self.password = os.environ.get("BB_PASSWORD")
               self.dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
               
-              if not all([self.namespace, self.repository, self.token]):
-                  logger.error("Missing variables.")
+              if not all([namespace, image, self.username, self.password]):
+                  logger.error("Missing required variables.")
                   sys.exit(1)
 
-              self.base_url = f"https://{self.registry}"
               self.session = requests.Session()
+              self.base_url = f"https://{self.registry}/v2"
               
-              # Using Bearer Auth (Standard for Quay Robots)
+              # 1. Authenticate with the Token Service
+              self.token = self.get_auth_token()
+              
+              # 2. Configure Session with the Token
               self.session.headers.update({
                   "Authorization": f"Bearer {self.token}",
-                  "Content-Type": "application/json"
+                  "Accept": "application/vnd.docker.distribution.manifest.v2+json"
               })
 
-          def get_image_tags(self):
+          def get_auth_token(self):
+              """Exchanges User/Pass for a Bearer Token via the Auth Service"""
+              service = "quay.io"
+              # Requesting pull AND push scope (push often implies delete/write in V2)
+              scope = f"repository:{self.repo}:pull,push"
+              
+              auth_url = f"https://{self.registry}/v2/auth?service={service}&scope={scope}"
               try:
-                  url = f"{self.base_url}/api/v1/repository/{self.namespace}/{self.repository}/tag/"
-                  params = {"limit": 100, "page": 1}
-                  all_tags = []
-                  
-                  while True:
-                      response = self.session.get(url, params=params, timeout=30)
-                      response.raise_for_status()
-                      data = response.json()
-                      tags = data.get("tags", [])
-                      if not tags: break
-                      all_tags.extend(tags)
-                      if not data.get("has_additional", False): break
-                      params["page"] += 1
-                  
-                  return all_tags
+                  resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
+                  if resp.status_code != 200:
+                      logger.error(f"Auth Failed ({resp.status_code}): {resp.text}")
+                      sys.exit(1)
+                  return resp.json().get("token")
               except Exception as e:
-                  logger.error(f"Failed to get tags: {e}")
-                  return []
+                  logger.error(f"Failed to authenticate: {e}")
+                  sys.exit(1)
 
-          def expire_tag(self, tag):
-              """Sets the expiration of a tag to NOW, prompting GC to clean it."""
+          def get_all_tags(self):
+              """Fetches all tags using pagination"""
+              url = f"{self.base_url}/{self.repo}/tags/list"
+              all_tags = []
+              
+              while url:
+                  try:
+                      resp = self.session.get(url)
+                      if resp.status_code != 200:
+                          logger.error(f"Failed to list tags: {resp.status_code}")
+                          break
+                      
+                      data = resp.json()
+                      all_tags.extend(data.get("tags", []))
+                      
+                      # Handle Link Header Pagination
+                      link = resp.headers.get("Link")
+                      url = None
+                      if link and "rel=\"next\"" in link:
+                          # Extract URL from <url>; rel="next"
+                          url = link.split(";")[0].strip("<>")
+                          # Ensure absolute URL if relative is returned
+                          if not url.startswith("http"):
+                              url = f"https://{self.registry}{url}"
+                  except Exception as e:
+                      logger.error(f"Error fetching tags: {e}")
+                      break
+              
+              logger.info(f"Found {len(all_tags)} tags total.")
+              return all_tags
+
+          def get_tag_date_and_digest(self, tag):
+              """
+              Fetches the manifest to find the config blob, then the blob to find the creation date.
+              This is heavy but necessary as V2 List doesn not provide dates.
+              """
+              try:
+                  # Get Manifest
+                  man_resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{tag}")
+                  if man_resp.status_code != 200:
+                      return None, None
+                  
+                  manifest = man_resp.json()
+                  digest = man_resp.headers.get("Docker-Content-Digest")
+                  
+                  # Get Config Blob Digest
+                  config_digest = manifest.get("config", {}).get("digest")
+                  if not config_digest:
+                      return None, None
+                  
+                  # Get Config Blob (contains the date)
+                  blob_resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{config_digest}")
+                  if blob_resp.status_code != 200:
+                      return None, None
+                  
+                  created_str = blob_resp.json().get("created") # ISO 8601
+                  # Parse Date
+                  dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                  return dt, digest
+              except Exception:
+                  return None, None
+
+          def delete_tag(self, tag, digest):
               if self.dry_run:
-                  logger.info(f"[DRY RUN] Would set expiration for {tag}")
+                  logger.info(f"[DRY RUN] Would delete {tag} (Digest: {digest})")
                   return True
               
-              try:
-                  # Quay API: PUT /tag/{tag}/expiration
-                  url = f"{self.base_url}/api/v1/repository/{self.namespace}/{self.repository}/tag/{tag}/expiration"
-                  
-                  # Set expiration to current time (effectively expires immediately)
-                  expiration_timestamp = int(time.time())
-                  payload = {"expiration": expiration_timestamp}
-                  
-                  response = self.session.put(url, json=payload, timeout=30)
-                  
-                  if response.status_code == 403:
-                      logger.error(f"403 Forbidden setting expiration for {tag}.")
-                      return False
-                      
-                  response.raise_for_status()
-                  logger.info(f"Successfully set expiration for {tag}")
+              # V2 Deletion is by Digest, not Tag
+              url = f"{self.base_url}/{self.repo}/manifests/{digest}"
+              resp = self.session.delete(url)
+              
+              if resp.status_code in [202, 200, 204]:
+                  logger.info(f"Deleted {tag}")
                   return True
-              except Exception as e:
-                  logger.error(f"Failed to expire {tag}: {e}")
+              elif resp.status_code == 405:
+                  logger.error(f"Delete Failed (405): Registry may have disabled Deletes or your password lacks permission.")
                   return False
-
-          def parse_timestamp(self, timestamp_raw):
-              try:
-                  if isinstance(timestamp_raw, (int, float)):
-                      return datetime.fromtimestamp(timestamp_raw, tz=timezone.utc)
-                  try:
-                      return datetime.fromtimestamp(int(timestamp_raw), tz=timezone.utc)
-                  except ValueError:
-                      pass
-                  dt = email.utils.parsedate_to_datetime(timestamp_raw)
-                  if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
-                  return dt
-              except:
-                  return None
+              else:
+                  logger.error(f"Delete Failed ({resp.status_code}) for {tag}")
+                  return False
 
           def run(self):
               max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
               max_keep = int(os.environ.get("MAX_KEEP", 5))
               
-              logger.info(f"Starting Expiration Scan: Max Age={max_age_days}d, Min Keep={max_keep}")
-              tags = self.get_image_tags()
-              
-              # Add parsed dates
+              tags = self.get_all_tags()
+              if not tags: return
+
+              logger.info("Fetching dates for all tags (this may take time)...")
+              tag_data = []
+              protected_digests = set()
+
               for tag in tags:
-                  tag["parsed_date"] = self.parse_timestamp(tag.get("last_modified"))
+                  dt, digest = self.get_tag_date_and_digest(tag)
+                  if dt and digest:
+                      tag_data.append({"name": tag, "date": dt, "digest": digest})
+                      if tag == "latest":
+                          protected_digests.add(digest)
 
-              # Sort newest first
-              tags_sorted = sorted(
-                  tags, 
-                  key=lambda t: t["parsed_date"] or datetime.min.replace(tzinfo=timezone.utc), 
-                  reverse=True
-              )
-              
+              # Sort by date descending (newest first)
+              tag_data.sort(key=lambda x: x["date"], reverse=True)
+
               kept_count = 0
-              for tag in tags_sorted:
-                  tag_name = tag.get("name", "")
-                  tag_date = tag.get("parsed_date")
+              for item in tag_data:
+                  tag = item["name"]
+                  digest = item["digest"]
+                  
+                  # Calculate Age
+                  age_days = (datetime.now(timezone.utc) - item["date"]).days
 
-                  # Skip 'latest' and the newest N tags
-                  if tag_name == "latest" or kept_count < max_keep:
-                      logger.info(f"Skipping {tag_name} (protected/recent)")
+                  # Protection 1: Latest
+                  if tag == "latest":
+                      logger.info(f"Keeping {tag} (Protected)")
+                      kept_count += 1
+                      continue
+                  
+                  # Protection 2: Max Keep Count
+                  if kept_count < max_keep:
+                      logger.info(f"Keeping {tag} (Keep Limit)")
+                      protected_digests.add(digest)
                       kept_count += 1
                       continue
 
-                  # Check age
-                  if tag_date:
-                      age_days = (datetime.now(timezone.utc) - tag_date).days
-                      if age_days > max_age_days:
-                          self.expire_tag(tag_name)
-                          continue
-                  
-                  logger.info(f"Skipping {tag_name} (not expired)")
+                  # Protection 3: Shared Digests (e.g. tag is same image as "latest")
+                  if digest in protected_digests:
+                      logger.info(f"Keeping {tag} (Shared Digest)")
+                      continue
+
+                  # Expiration Check
+                  if age_days > max_age_days:
+                      self.delete_tag(tag, digest)
+                  else:
+                      logger.info(f"Keeping {tag} (Age: {age_days}d)")
 
       if __name__ == "__main__":
-          cleaner = QuayExpirationSetter()
+          cleaner = DockerV2Cleaner()
           cleaner.run()
       '
