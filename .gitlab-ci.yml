@@ -58,19 +58,18 @@ cleanup-old-tags:
       python3 -c '
       import os
       import sys
+      import json
       import logging
       import requests
       from datetime import datetime, timezone
       from requests.auth import HTTPBasicAuth
 
-      # Configure logging
       logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
       logger = logging.getLogger(__name__)
 
       class DockerV2Cleaner:
           def __init__(self):
               self.registry = "quay.io"
-              # Ensure namespace/image format
               namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
               image = os.environ.get("IMAGE_NAME")
               self.repo = f"{namespace}/{image}"
@@ -80,167 +79,167 @@ cleanup-old-tags:
               self.dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
               
               if not all([namespace, image, self.username, self.password]):
-                  logger.error("Missing required variables.")
+                  logger.error("Missing variables.")
                   sys.exit(1)
 
               self.session = requests.Session()
               self.base_url = f"https://{self.registry}/v2"
               
-              # 1. Authenticate with the Token Service
               self.token = self.get_auth_token()
-              
-              # 2. Configure Session with the Token
               self.session.headers.update({
                   "Authorization": f"Bearer {self.token}",
-                  "Accept": "application/vnd.docker.distribution.manifest.v2+json"
+                  # Accept both standard Docker manifests and OCI artifacts (important for .sig)
+                  "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"
               })
 
           def get_auth_token(self):
-              """Exchanges User/Pass for a Bearer Token via the Auth Service"""
               service = "quay.io"
-              # Requesting pull AND push scope (push often implies delete/write in V2)
               scope = f"repository:{self.repo}:pull,push"
-              
               auth_url = f"https://{self.registry}/v2/auth?service={service}&scope={scope}"
               try:
                   resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
                   if resp.status_code != 200:
-                      logger.error(f"Auth Failed ({resp.status_code}): {resp.text}")
+                      logger.error(f"Auth Failed: {resp.text}")
                       sys.exit(1)
                   return resp.json().get("token")
               except Exception as e:
-                  logger.error(f"Failed to authenticate: {e}")
+                  logger.error(f"Auth Error: {e}")
                   sys.exit(1)
 
           def get_all_tags(self):
-              """Fetches all tags using pagination"""
               url = f"{self.base_url}/{self.repo}/tags/list"
               all_tags = []
-              
               while url:
                   try:
                       resp = self.session.get(url)
-                      if resp.status_code != 200:
-                          logger.error(f"Failed to list tags: {resp.status_code}")
-                          break
-                      
+                      if resp.status_code != 200: break
                       data = resp.json()
                       all_tags.extend(data.get("tags", []))
-                      
-                      # Handle Link Header Pagination
                       link = resp.headers.get("Link")
                       url = None
                       if link and "rel=\"next\"" in link:
-                          # Extract URL from <url>; rel="next"
                           url = link.split(";")[0].strip("<>")
-                          # Ensure absolute URL if relative is returned
-                          if not url.startswith("http"):
-                              url = f"https://{self.registry}{url}"
-                  except Exception as e:
-                      logger.error(f"Error fetching tags: {e}")
-                      break
-              
-              logger.info(f"Found {len(all_tags)} tags total.")
+                          if not url.startswith("http"): url = f"https://{self.registry}{url}"
+                  except: break
               return all_tags
 
-          def get_tag_date_and_digest(self, tag):
+          def parse_date(self, date_str):
+              try:
+                  # Handle fractional seconds and Z
+                  date_str = date_str.replace("Z", "+00:00")
+                  # Truncate fractional seconds if python < 3.11 struggles (simple fix)
+                  if "." in date_str and "+" in date_str:
+                      main, tz = date_str.split("+")
+                      main = main[:26] # Truncate to microseconds
+                      date_str = f"{main}+{tz}"
+                  return datetime.fromisoformat(date_str)
+              except:
+                  return None
+
+          def get_tag_metadata(self, tag):
               """
-              Fetches the manifest to find the config blob, then the blob to find the creation date.
-              This is heavy but necessary as V2 List doesn not provide dates.
+              Robustly finds a date for the tag using 3 strategies.
               """
               try:
-                  # Get Manifest
+                  # 1. Fetch Manifest
                   man_resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{tag}")
-                  if man_resp.status_code != 200:
-                      return None, None
+                  if man_resp.status_code != 200: return None
                   
                   manifest = man_resp.json()
                   digest = man_resp.headers.get("Docker-Content-Digest")
+                  dt = None
+
+                  # STRATEGY A: Check OCI Annotations (Common in .sig/artifacts)
+                  if "annotations" in manifest:
+                      created = manifest["annotations"].get("org.opencontainers.image.created")
+                      if created:
+                          dt = self.parse_date(created)
+
+                  # STRATEGY B: Check Config Blob (Standard Images)
+                  if not dt and "config" in manifest:
+                      config_digest = manifest["config"].get("digest")
+                      if config_digest:
+                          blob_resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{config_digest}")
+                          if blob_resp.status_code == 200:
+                              dt = self.parse_date(blob_resp.json().get("created"))
+
+                  # STRATEGY C: Check V1 Compatibility History (Legacy/Older Images)
+                  if not dt and "history" in manifest and len(manifest["history"]) > 0:
+                      try:
+                          v1_json = json.loads(manifest["history"][0]["v1Compatibility"])
+                          dt = self.parse_date(v1_json.get("created"))
+                      except: pass
+
+                  if dt:
+                      # Ensure timezone awareness
+                      if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+                      return {"name": tag, "date": dt, "digest": digest}
                   
-                  # Get Config Blob Digest
-                  config_digest = manifest.get("config", {}).get("digest")
-                  if not config_digest:
-                      return None, None
-                  
-                  # Get Config Blob (contains the date)
-                  blob_resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{config_digest}")
-                  if blob_resp.status_code != 200:
-                      return None, None
-                  
-                  created_str = blob_resp.json().get("created") # ISO 8601
-                  # Parse Date
-                  dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
-                  return dt, digest
-              except Exception:
-                  return None, None
+                  logger.warning(f"Could not find date for tag: {tag} (skipping)")
+                  return None
+
+              except Exception as e:
+                  logger.warning(f"Error processing {tag}: {e}")
+                  return None
 
           def delete_tag(self, tag, digest):
               if self.dry_run:
-                  logger.info(f"[DRY RUN] Would delete {tag} (Digest: {digest})")
+                  logger.info(f"[DRY RUN] Delete {tag}")
                   return True
               
-              # V2 Deletion is by Digest, not Tag
-              url = f"{self.base_url}/{self.repo}/manifests/{digest}"
-              resp = self.session.delete(url)
-              
-              if resp.status_code in [202, 200, 204]:
+              resp = self.session.delete(f"{self.base_url}/{self.repo}/manifests/{digest}")
+              if resp.status_code in [200, 202, 204]:
                   logger.info(f"Deleted {tag}")
                   return True
-              elif resp.status_code == 405:
-                  logger.error(f"Delete Failed (405): Registry may have disabled Deletes or your password lacks permission.")
-                  return False
-              else:
-                  logger.error(f"Delete Failed ({resp.status_code}) for {tag}")
-                  return False
+              logger.error(f"Failed to delete {tag}: {resp.status_code}")
+              return False
 
           def run(self):
               max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
               max_keep = int(os.environ.get("MAX_KEEP", 5))
               
+              logger.info(f"Scanning {self.repo}...")
               tags = self.get_all_tags()
-              if not tags: return
+              logger.info(f"Found {len(tags)} tags. Fetching metadata...")
 
-              logger.info("Fetching dates for all tags (this may take time)...")
               tag_data = []
               protected_digests = set()
 
               for tag in tags:
-                  dt, digest = self.get_tag_date_and_digest(tag)
-                  if dt and digest:
-                      tag_data.append({"name": tag, "date": dt, "digest": digest})
+                  meta = self.get_tag_metadata(tag)
+                  if meta:
+                      tag_data.append(meta)
                       if tag == "latest":
-                          protected_digests.add(digest)
+                          protected_digests.add(meta["digest"])
 
-              # Sort by date descending (newest first)
+              # Sort by date (newest first)
               tag_data.sort(key=lambda x: x["date"], reverse=True)
 
               kept_count = 0
               for item in tag_data:
                   tag = item["name"]
                   digest = item["digest"]
-                  
-                  # Calculate Age
                   age_days = (datetime.now(timezone.utc) - item["date"]).days
 
-                  # Protection 1: Latest
+                  # 1. Protect Latest
                   if tag == "latest":
                       logger.info(f"Keeping {tag} (Protected)")
                       kept_count += 1
                       continue
                   
-                  # Protection 2: Max Keep Count
+                  # 2. Protect Recent Count
                   if kept_count < max_keep:
                       logger.info(f"Keeping {tag} (Keep Limit)")
                       protected_digests.add(digest)
                       kept_count += 1
                       continue
 
-                  # Protection 3: Shared Digests (e.g. tag is same image as "latest")
+                  # 3. Protect Shared Digests
                   if digest in protected_digests:
                       logger.info(f"Keeping {tag} (Shared Digest)")
                       continue
 
-                  # Expiration Check
+                  # 4. Check Age
                   if age_days > max_age_days:
                       self.delete_tag(tag, digest)
                   else:
