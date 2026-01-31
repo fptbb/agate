@@ -9,9 +9,3 @@ modules:
   - type: script
     scripts:
       - branding.sh
-      - os-birthday.sh
-
-  - type: systemd
-    system:
-      enabled:
-        - os-birthday
