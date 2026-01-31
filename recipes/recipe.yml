@@ -21,7 +21,7 @@ modules:
   - type: signing
 labels:
   "org.opencontainers.image.title": "Agate"
-  "org.opencontainers.image.source": "https://os.fpt.icu/"
+  "org.opencontainers.image.source": "https://gitlab.com/fpsys/agate"
   "org.opencontainers.image.url": "https://os.fpt.icu/"
   "org.opencontainers.image.documentation": "https://os.fpt.icu/"
   "org.opencontainers.image.description": "A custom image of Bazzite for personal needs."
@@ -33,3 +33,4 @@ labels:
   "io.artifacthub.package.prerelease": "false"
   "io.artifacthub.package.keywords": "fp-os, bootc, ostree, ublue, universal-blue, blue-build, agate"
   "io.artifacthub.package.deprecated": "false"
+  "io.artifacthub.package.alternative-locations": "ghcr.io/fptbb/agate:latest"

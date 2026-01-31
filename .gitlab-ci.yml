@@ -73,7 +73,6 @@ cleanup-old-tags:
               namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
               image = os.environ.get("IMAGE_NAME")
               self.repo = f"{namespace}/{image}"
-              
               self.username = os.environ.get("BB_USERNAME")
               self.password = os.environ.get("BB_PASSWORD")
               self.dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
@@ -84,7 +83,6 @@ cleanup-old-tags:
 
               self.session = requests.Session()
               self.base_url = f"https://{self.registry}/v2"
-              
               self.token = self.get_auth_token()
               self.session.headers.update({
                   "Authorization": f"Bearer {self.token}",
@@ -125,14 +123,11 @@ cleanup-old-tags:
           def parse_date(self, date_str):
               try:
                   date_str = date_str.replace("Z", "+00:00")
-                  # Truncate fractional seconds for compatibility
                   if "." in date_str and "+" in date_str:
                       main, tz = date_str.split("+")
-                      main = main[:26]
-                      date_str = f"{main}+{tz}"
+                      date_str = f"{main[:26]}+{tz}"
                   return datetime.fromisoformat(date_str)
-              except:
-                  return None
+              except: return None
 
           def get_tag_metadata(self, tag):
               try:
@@ -143,12 +138,12 @@ cleanup-old-tags:
                   digest = man_resp.headers.get("Docker-Content-Digest")
                   dt = None
 
-                  # 1. Annotations (Newer OCI/Cosign)
+                  # Strategy A: OCI Annotations (Common in .sig)
                   if "annotations" in manifest:
                       created = manifest["annotations"].get("org.opencontainers.image.created")
                       if created: dt = self.parse_date(created)
 
-                  # 2. Config Blob (Standard Docker)
+                  # Strategy B: Config Blob (Standard Images)
                   if not dt and "config" in manifest:
                       config_digest = manifest["config"].get("digest")
                       if config_digest:
@@ -156,93 +151,113 @@ cleanup-old-tags:
                           if blob_resp.status_code == 200:
                               dt = self.parse_date(blob_resp.json().get("created"))
 
-                  # 3. V1 Compatibility (Legacy)
+                  # Strategy C: Legacy History
                   if not dt and "history" in manifest and len(manifest["history"]) > 0:
                       try:
-                          v1_json = json.loads(manifest["history"][0]["v1Compatibility"])
-                          dt = self.parse_date(v1_json.get("created"))
+                          v1 = json.loads(manifest["history"][0]["v1Compatibility"])
+                          dt = self.parse_date(v1.get("created"))
                       except: pass
 
                   if dt:
                       if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
                       return {"name": tag, "date": dt, "digest": digest}
                   
-                  # If we absolutely cannot find a date, we assume it is old/invalid? 
-                  # Safer to log warning and skip deletion to prevent accidents.
-                  logger.warning(f"Could not find date for tag: {tag} (skipping safety check)")
+                  logger.warning(f"No date found for {tag}, skipping safety check.")
                   return None
-
-              except Exception as e:
-                  logger.warning(f"Error processing {tag}: {e}")
-                  return None
+              except: return None
 
           def delete_tag(self, tag, digest):
               if self.dry_run:
                   logger.info(f"[DRY RUN] Delete {tag}")
                   return True
-              
               resp = self.session.delete(f"{self.base_url}/{self.repo}/manifests/{digest}")
               if resp.status_code in [200, 202, 204]:
                   logger.info(f"Deleted {tag}")
                   return True
-              logger.error(f"Failed to delete {tag}: {resp.status_code}")
+              logger.error(f"Failed delete {tag}: {resp.status_code}")
               return False
+
+          def is_cosign_sig(self, tag_name):
+              """Checks if tag looks like sha256-....sig"""
+              return tag_name.startswith("sha256-") and tag_name.endswith(".sig")
+
+          def get_cosign_sig_name(self, image_digest):
+              """Calculates the expected .sig tag name for a given image digest"""
+              # sha256:abcdef... -> sha256-abcdef....sig
+              clean_digest = image_digest.replace(":", "-")
+              return f"{clean_digest}.sig"
 
           def run(self):
               max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
               max_keep = int(os.environ.get("MAX_KEEP", 5))
-              
-              # PROTECTED TAGS CONFIGURATION
-              protected_tag_names = ["latest", "latest-cache"]
-              
+              protected_tags = ["latest", "latest-cache"]
+
               logger.info(f"Scanning {self.repo}...")
               tags = self.get_all_tags()
               logger.info(f"Found {len(tags)} tags. Fetching metadata...")
 
               tag_data = []
-              protected_digests = set()
-
               for tag in tags:
                   meta = self.get_tag_metadata(tag)
-                  if meta:
-                      tag_data.append(meta)
-                      # If this tag is explicitly protected, save its digest
-                      if tag in protected_tag_names:
-                          protected_digests.add(meta["digest"])
+                  if meta: tag_data.append(meta)
 
-              # Sort by date (newest first)
+              # Sort newest first
               tag_data.sort(key=lambda x: x["date"], reverse=True)
 
-              kept_count = 0
+              # === PASS 1: Identify Protections ===
+              kept_digests = set()
+              kept_sig_names = set()
+              
+              image_count = 0
+              
               for item in tag_data:
-                  tag = item["name"]
+                  name = item["name"]
+                  digest = item["digest"]
+                  
+                  # Explicit Protection (latest, etc)
+                  if name in protected_tags:
+                      kept_digests.add(digest)
+                      kept_sig_names.add(self.get_cosign_sig_name(digest))
+                      continue
+
+                  # Skip signatures during the "Count" phase (we only count real images against MAX_KEEP)
+                  if self.is_cosign_sig(name):
+                      continue
+
+                  # Count Check
+                  if image_count < max_keep:
+                      kept_digests.add(digest)
+                      kept_sig_names.add(self.get_cosign_sig_name(digest)) # Protect its signature!
+                      image_count += 1
+
+              logger.info(f"Identified {len(kept_digests)} images to keep (and their signatures).")
+
+              # === PASS 2: Execute Cleanup ===
+              for item in tag_data:
+                  name = item["name"]
                   digest = item["digest"]
                   age_days = (datetime.now(timezone.utc) - item["date"]).days
 
-                  # 1. Check Protected Names
-                  if tag in protected_tag_names:
-                      logger.info(f"Keeping {tag} (Protected Name)")
-                      # We typically count protected tags as "kept" to avoid keeping 5 old ones + 2 protected ones
-                      kept_count += 1
+                  # 1. Is this an explicitly kept image?
+                  if name in protected_tags:
+                      logger.info(f"Keeping {name} (Protected Name)")
                       continue
                   
-                  # 2. Check Keep Count (Newest N)
-                  if kept_count < max_keep:
-                      logger.info(f"Keeping {tag} (Within keep limit)")
-                      protected_digests.add(digest)
-                      kept_count += 1
+                  # 2. Is this an image we decided to keep?
+                  if digest in kept_digests and not self.is_cosign_sig(name):
+                      logger.info(f"Keeping {name} (Within Keep Limit)")
                       continue
 
-                  # 3. Check Shared Digests (e.g., tag points to same image as 'latest')
-                  if digest in protected_digests:
-                      logger.info(f"Keeping {tag} (Shared Digest with protected tag)")
+                  # 3. Is this a Signature for a kept image?
+                  if name in kept_sig_names:
+                      logger.info(f"Keeping {name} (Signature for active image)")
                       continue
 
-                  # 4. Expiration Check
+                  # 4. Age Check
                   if age_days > max_age_days:
-                      self.delete_tag(tag, digest)
+                      self.delete_tag(name, digest)
                   else:
-                      logger.info(f"Keeping {tag} (Age: {age_days}d)")
+                      logger.info(f"Keeping {name} (Age: {age_days}d)")
 
       if __name__ == "__main__":
           cleaner = DockerV2Cleaner()
