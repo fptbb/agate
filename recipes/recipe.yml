@@ -26,6 +26,7 @@ labels:
   "org.opencontainers.image.documentation": "https://os.fpt.icu/"
   "org.opencontainers.image.description": "A custom image of Bazzite for personal needs."
   "org.opencontainers.image.vendor": "fptbb"
+  "org.opencontainers.image.base.name": "quay.io/fptbb/agate:latest"
   "io.artifacthub.package.readme-url": "https://raw.githubusercontent.com/fptbb/agate/refs/heads/main/README.md"
   "io.artifacthub.package.logo-url": "https://raw.githubusercontent.com/fptbb/agate/main/files/system/usr/share/pixmaps/fp-logo.png"
   "io.artifacthub.package.maintainers": '[{\"name\": \"fptbb\", \"email\": \"lucas@fptbb.com\"}]'
