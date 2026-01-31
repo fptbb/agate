@@ -12,6 +12,7 @@ workflow:
 
 stages:
   - build
+  - publish
   - cleanup
 
 build-image:
@@ -43,6 +44,42 @@ build-image:
     - sleep 5 # Wait a bit for the docker-in-docker service to start
     - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/agate"
     - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
+
+publish-metadata:
+  stage: publish
+  image: alpine:latest
+  variables:
+    REGCTL_VERSION: v0.5.0
+    # The target tag specifically for Artifact Hub verification
+    DEST_REPO: "quay.io/fptbb/agate:artifacthub.io"
+  rules:
+    # Only run on the default branch (usually main/master) or tags
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  before_script:
+    # 1. Install regctl dependencies and binary
+    - apk add --no-cache curl
+    - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
+    - chmod +x /usr/local/bin/regctl
+    
+    # 2. Authenticate with Quay.io using your existing bot credentials
+    - echo "$BB_PASSWORD" | regctl registry login quay.io -u "$BB_USERNAME" --pass-stdin
+  script:
+    # 3. Verify the config file exists before trying to push
+    - |
+      if [ ! -f "artifacthub-repo.yml" ]; then
+        echo "Error: artifacthub-repo.yml not found in the root of the repository."
+        exit 1
+      fi
+      
+    # 4. Push the metadata artifact
+    - |
+      regctl artifact put \
+        --format '{{ .Manifest.GetDescriptor.Digest }}' \
+        --artifact-type application/vnd.cncf.artifacthub.config.v1+yaml \
+        -f artifacthub-repo.yml \
+        --file-media-type "application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml" \
+        "$DEST_REPO"
 
 cleanup-old-tags:
   stage: cleanup
