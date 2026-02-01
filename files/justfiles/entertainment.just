@@ -1,5 +1,3 @@
-# justfile
-
 # Fixes permissions, installs dependencies if missing, and updates Spicetify
 [group("utilities")]
 agate-spicetify:
@@ -32,7 +30,7 @@ agate-spicetify:
     fi
 
     mkdir -p "$SPOTIFY_PATH/Apps"
-    
+
     if [ "$USE_SUDO" = true ]; then
         sudo chmod a+wr "$SPOTIFY_PATH"
         sudo chmod a+wr -R "$SPOTIFY_PATH/Apps"
