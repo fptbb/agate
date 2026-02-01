@@ -43,3 +43,7 @@ modules:
           - org.vinegarhq.Vinegar
           - rest.insomnia.Insomnia
       - scope: user # Also add Flathub user repo, but no user packages
+  - type: justfiles
+    validate: true
+    include:
+        - entertainment.just
