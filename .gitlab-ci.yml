@@ -45,6 +45,34 @@ build-image:
     - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/agate"
     - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
 
+publish-metadata:
+  stage: publish
+  image: alpine:latest
+  variables:
+    REGCTL_VERSION: v0.5.0
+    DEST_REPO: "quay.io/fptbb/agate:artifacthub.io"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  before_script:
+    - apk add --no-cache curl
+    - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
+    - chmod +x /usr/local/bin/regctl
+    - echo "$BB_PASSWORD" | regctl registry login quay.io -u "$BB_USERNAME" --pass-stdin
+  script:
+    - |
+      if [ ! -f "artifacthub-repo.yml" ]; then
+        echo "Error: artifacthub-repo.yml not found in repository root."
+        exit 1
+      fi
+    - |
+      regctl artifact put \
+        --format '{{ .Manifest.GetDescriptor.Digest }}' \
+        --artifact-type application/vnd.cncf.artifacthub.config.v1+yaml \
+        -f artifacthub-repo.yml \
+        --file-media-type "application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml" \
+        $DEST_REPO
+
 cleanup-old-tags:
   stage: cleanup
   image: python:3-alpine
