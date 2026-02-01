@@ -10,7 +10,7 @@ log() {
 
 # Your code goes here.
 IMAGE_INFO="/usr/share/ublue-os/image-info.json"
-IMAGE_REF="ostree-image-signed:docker://ghcr.io/fptbb/agate"
+IMAGE_REF="ostree-image-signed:docker://quay.io/fptbb/agate"
 
 # image-info File
 sed -i 's/"image-name": [^,]*/"image-name": "'"agate"'"/' $IMAGE_INFO

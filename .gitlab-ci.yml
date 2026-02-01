@@ -45,34 +45,6 @@ build-image:
     - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/agate"
     - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
 
-publish-metadata:
-  stage: publish
-  image: alpine:latest
-  variables:
-    REGCTL_VERSION: v0.5.0
-    DEST_REPO: "quay.io/fptbb/agate:artifacthub.io"
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_COMMIT_TAG
-  before_script:
-    - apk add --no-cache curl
-    - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
-    - chmod +x /usr/local/bin/regctl
-    - echo "$BB_PASSWORD" | regctl registry login quay.io -u "$BB_USERNAME" --pass-stdin
-  script:
-    - |
-      if [ ! -f "artifacthub-repo.yml" ]; then
-        echo "Error: artifacthub-repo.yml not found in repository root."
-        exit 1
-      fi
-    - |
-      regctl artifact put \
-        --format '{{ .Manifest.GetDescriptor.Digest }}' \
-        --artifact-type application/vnd.cncf.artifacthub.config.v1+yaml \
-        -f artifacthub-repo.yml \
-        --file-media-type "application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml" \
-        $DEST_REPO
-
 cleanup-old-tags:
   stage: cleanup
   image: python:3-alpine
@@ -161,20 +133,15 @@ cleanup-old-tags:
               except: return None, None
 
           def get_date_from_single_manifest(self, manifest):
-              # Check OCI Annotations
               if "annotations" in manifest:
                   created = manifest["annotations"].get("org.opencontainers.image.created")
                   if created: return self.parse_date(created)
-              
-              # Check Config Blob
               if "config" in manifest:
                   cfg_digest = manifest["config"].get("digest")
                   if cfg_digest:
                       resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}")
                       if resp.status_code == 200:
                           return self.parse_date(resp.json().get("created"))
-                          
-              # Check Legacy History
               if "history" in manifest and len(manifest["history"]) > 0:
                   try:
                       v1 = json.loads(manifest["history"][0]["v1Compatibility"])
@@ -183,28 +150,22 @@ cleanup-old-tags:
               return None
 
           def get_tag_metadata(self, tag):
-              # 1. Fetch Root Manifest (Could be Image OR Index/List)
               root_manifest, root_digest = self.fetch_manifest(tag)
               if not root_manifest: return None
-
               dt = None
               
-              # Case A: It is a Manifest List / Index (Multi-Arch)
+              # Multi-Arch List
               if "manifests" in root_manifest:
-                  # Grab the first sub-manifest to find the date
                   sub_digest = root_manifest["manifests"][0]["digest"]
                   sub_manifest, _ = self.fetch_manifest(sub_digest)
-                  if sub_manifest:
-                      dt = self.get_date_from_single_manifest(sub_manifest)
-              # Case B: It is a Standard Image Manifest
+                  if sub_manifest: dt = self.get_date_from_single_manifest(sub_manifest)
+              # Standard Image
               else:
                   dt = self.get_date_from_single_manifest(root_manifest)
 
               if dt:
                   if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
                   return {"name": tag, "date": dt, "digest": root_digest}
-              
-              logger.warning(f"No date found for {tag} (Digest: {root_digest}). Skipping to be safe.")
               return None
 
           def delete_tag(self, tag, digest):
@@ -229,59 +190,75 @@ cleanup-old-tags:
 
               logger.info(f"Scanning {self.repo}...")
               tags = self.get_all_tags()
-              logger.info(f"Found {len(tags)} tags. Fetching metadata...")
+              logger.info(f"Found {len(tags)} tags. Parsing metadata...")
 
               tag_data = []
               for tag in tags:
                   meta = self.get_tag_metadata(tag)
                   if meta: tag_data.append(meta)
 
+              # Sort: Newest First
               tag_data.sort(key=lambda x: x["date"], reverse=True)
 
-              kept_digests = set()
-              kept_sig_names = set()
+              # === PASS 1: Identify ACTIVE images ===
+              # We determine which images are "Kept". 
+              # If an image is kept, we Whitelist its Digest AND its Signature.
+              
+              active_digests = set()
+              active_signatures = set()
               image_count = 0
               
-              # Pass 1: Identify what to keep
               for item in tag_data:
                   name = item["name"]
                   digest = item["digest"]
                   
-                  # Skip .sig files in the "Keep Count" logic
+                  # Skip signature files during decision making
                   if name.endswith(".sig"): continue
 
+                  age_days = (datetime.now(timezone.utc) - item["date"]).days
+                  should_keep = False
+
+                  # Criterion A: Protected Name
                   if name in protected_tags:
-                      kept_digests.add(digest)
-                      kept_sig_names.add(self.get_cosign_sig_name(digest))
-                      continue
-
-                  if image_count < max_keep:
-                      kept_digests.add(digest)
-                      kept_sig_names.add(self.get_cosign_sig_name(digest))
+                      should_keep = True
+                  
+                  # Criterion B: Within Max Keep Count
+                  elif image_count < max_keep:
+                      should_keep = True
                       image_count += 1
+                  
+                  # Criterion C: Young Age
+                  elif age_days <= max_age_days:
+                      should_keep = True
 
-              # Pass 2: Cleanup
+                  if should_keep:
+                      active_digests.add(digest)
+                      # CRITICAL: Calculate and whitelist the signature for this digest
+                      active_signatures.add(self.get_cosign_sig_name(digest))
+
+              logger.info(f"Analysis Complete. Protecting {len(active_digests)} images and their signatures.")
+
+              # === PASS 2: Perform Cleanup ===
               for item in tag_data:
                   name = item["name"]
                   digest = item["digest"]
-                  age_days = (datetime.now(timezone.utc) - item["date"]).days
 
-                  if name in protected_tags:
-                      logger.info(f"Keeping {name} (Protected)")
-                      continue
-                  
-                  if digest in kept_digests and not name.endswith(".sig"):
-                      logger.info(f"Keeping {name} (Active)")
-                      continue
-
-                  if name in kept_sig_names:
-                      logger.info(f"Keeping {name} (Signature for Active Image)")
+                  # Case 1: It is a Signature
+                  if name.endswith(".sig"):
+                      if name in active_signatures:
+                          logger.info(f"Keeping {name} (Signature of Active Image)")
+                      else:
+                          # Delete orphaned signatures or signatures of expired images
+                          logger.info(f"Deleting {name} (Orphaned/Expired Signature)")
+                          self.delete_tag(name, digest)
                       continue
 
-                  if age_days > max_age_days:
-                      self.delete_tag(name, digest)
+                  # Case 2: It is an Image
+                  if digest in active_digests:
+                      logger.info(f"Keeping {name} (Active Image)")
                   else:
-                      logger.info(f"Keeping {name} (Age: {age_days}d)")
+                      logger.info(f"Deleting {name} (Expired/Excess Image)")
+                      self.delete_tag(name, digest)
 
       if __name__ == "__main__":
           cleaner = DockerV2Cleaner()
