@@ -13,6 +13,7 @@ workflow:
 stages:
   - build
   - publish
+  - deploy
   - cleanup
 
 build-image:
@@ -72,6 +73,23 @@ publish-metadata:
         -f artifacthub-repo.yml \
         --file-media-type "application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml" \
         $DEST_REPO
+
+# Job required for GitLab Pages
+pages:
+  stage: deploy
+  image: ruby:3.2
+  cache:
+    paths:
+      - vendor/ruby
+  script:
+    - bundle config set --local path 'vendor/ruby'
+    - bundle install
+    - bundle exec jekyll build -d public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 cleanup-old-tags:
   stage: cleanup
