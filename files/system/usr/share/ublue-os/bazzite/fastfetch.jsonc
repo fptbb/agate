@@ -106,7 +106,8 @@
 		},
 		{
 			"type": "packages",
-			"key": " 󰏖"
+			"key": " 󰏖",
+			"combined": true
 		},
 		"break",
 		{
