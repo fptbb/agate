@@ -37,4 +37,8 @@ UI_URL=$(get_github_asset_url "evilsocket/opensnitch" "^opensnitch-ui-.*\.noarch
 
 echo "Installing OpenSnitch... $DAEMON_URL $UI_URL"
 # installs directly from url to avoid temp files
-dnf5 install -y "${DAEMON_URL}" "${UI_URL}"
+dnf5 install -y "${UI_URL}"
+
+# installs the daemon using rpm directly to skip the %post script
+# the %post script attempts to restart systemd services, which fails in container builds
+rpm -Uvh --nopost "${DAEMON_URL}"
