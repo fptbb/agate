@@ -68,6 +68,10 @@ modules:
         - winetricks # work around common problems in wine
         - dotnet-sdk-8.0 # .net 8.0 software development kit
         - inxi # a full featured system information script
+        - python3-grpcio # dependency for opensnitch
+        - python3-protobuf # dependency for opensnitch
+        - python3-slugify # dependency for opensnitch
+        - python3-qt5 # dependency for opensnitch
   - type: script
     scripts:
       - whatpulse.sh
