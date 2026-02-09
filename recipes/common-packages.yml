@@ -30,12 +30,15 @@ modules:
         - linuxtoys
         - gcc-c++
         - libpcap-devel
+        - jq
   - type: script
     scripts:
       - whatpulse.sh
+      - opensnitch.sh
   - type: systemd
     system:
       enabled:
         - nordvpnd
         - tailscaled
         - whatpulse-pcap-service
+        - opensnitch
