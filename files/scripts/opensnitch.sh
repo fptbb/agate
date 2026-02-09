@@ -37,4 +37,4 @@ UI_URL=$(get_github_asset_url "evilsocket/opensnitch" "^opensnitch-ui-.*\.noarch
 
 echo "Installing OpenSnitch... $DAEMON_URL $UI_URL"
 # installs directly from url to avoid temp files
-dnf5 install "${DAEMON_URL}" "${UI_URL}"
+dnf5 install -y "${DAEMON_URL}" "${UI_URL}"
