@@ -6,7 +6,6 @@ modules:
     repos:
       cleanup: true
       copr:
-        - fptbb/fp-os-meta
         - jloehel/yadm
         - bigjapka/VeraCrypt
         - psygreg/linuxtoys
@@ -21,7 +20,6 @@ modules:
       skip-unavailable: true
       skip-broken: true
       packages:
-        - fp-os-meta
         - nordvpn
         - tailscale
         - yadm
@@ -31,6 +29,45 @@ modules:
         - gcc-c++
         - libpcap-devel
         - jq
+        - bash-completion # enables tab-completion for many cli tools
+        - buildah # build oci/docker images without needing a daemon
+        - code # visual studio code ide for development
+        - copr-cli # manage fedora copr repositories from the command line
+        - coreos-installer # tool to install fedora coreos systems
+        - dialog # show text-based ui dialogs in shell scripts
+        - fuse-encfs # encrypted filesystem support via fuse
+        - gameconqueror # cheat engine for linux (debug and memory edit)
+        - git # distributed version control system
+        - gnome-calculator # simple desktop calculator
+        - gnome-disk-utility # gui for disk management
+        - gnupg2 # openpgp encryption and signing tools
+        - iproute # networking utilities like ip addr and ip route
+        - kde-partitionmanager # gui tool to manage disk partitions
+        - kitty # extremely fast, gpu-accelerated terminal emulator
+        - kleopatra # certificate and key management tool
+        - libnotify # send desktop notifications from scripts and apps
+        - libpcap # packet capture library for network sniffing tools
+        - libpcap-devel # libraries and header files for the libpcap library
+        - megatools # access mega.nz cloud storage from cli
+        - netcat # tcp/udp swiss-army knife for networking
+        - nmap-ncat # alternative netcat implementation (comes with nmap)
+        - pam-u2f # yubikey and fido u2f authentication for pam
+        - powerline-fonts # patched fonts with powerline symbols
+        - rpm-build # tools to build rpm packages
+        - rpmdevtools # developer tools for rpm packaging
+        - tinygo # small go compiler for microcontrollers and webassembly
+        - upx # ultimate packer for executables (binary compressor)
+        - yt-dlp # powerful video downloader with youtube support
+        - zsh # feature-rich shell with scripting capabilities
+        - protonvpn-cli # the official linux cli for protonvpn.
+        - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images.
+        - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension.
+        - heimdall # utility to flash firmware on to galaxy s devices
+        - p7zip # very high compression ratio file archiver
+        - wine # a compatibility layer for windows applications
+        - winetricks # work around common problems in wine
+        - dotnet-sdk-8.0 # .net 8.0 software development kit
+        - inxi # a full featured system information script
   - type: script
     scripts:
       - whatpulse.sh
