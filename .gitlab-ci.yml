@@ -26,73 +26,139 @@ check-update:
     - pip install requests
     - |
       python3 -c '
-      import os, sys, requests, datetime
-      from datetime import datetime
-      
-      def parse_date(d):
-          try:
-              d = d.replace("Z", "+00:00")
-              if "." in d and "+" in d:
-                  main, tz = d.split("+")
-                  d = f"{main[:26]}+{tz}"
-              return datetime.fromisoformat(d)
-          except: return None
+      import os, sys, requests, datetime, json, logging
+      from datetime import datetime, timezone
+      from requests.auth import HTTPBasicAuth
 
-      def get_token(registry, repo):
-          try:
-              if registry == "ghcr.io":
-                  return requests.get(f"https://ghcr.io/token?scope=repository:{repo}:pull").json()["token"]
-          except: pass
-          return None
+      logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+      logger = logging.getLogger(__name__)
 
-      def get_date(registry, repo, tag, user=None, pwd=None):
-          headers = {"Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"}
-          if registry == "ghcr.io":
-              t = get_token(registry, repo)
-              if t: headers["Authorization"] = f"Bearer {t}"
-          elif user and pwd:
-              headers["Authorization"] = requests.auth._basic_auth_str(user, pwd)
-          
-          try:
-              r = requests.get(f"https://{registry}/v2/{repo}/manifests/{tag}", headers=headers)
-              if r.status_code != 200: return None
-              d = r.json()
+      class ImageCheck:
+          def __init__(self, registry, repo, username=None, password=None, is_ghcr=False):
+              self.registry = registry
+              self.repo = repo
+              self.username = username
+              self.password = password
+              self.is_ghcr = is_ghcr
+              self.session = requests.Session()
+              self.base_url = f"https://{self.registry}/v2"
               
-              # Config Blob
-              cd = d.get("config", {}).get("digest")
-              if cd:
-                  br = requests.get(f"https://{registry}/v2/{repo}/blobs/{cd}", headers=headers)
-                  if br.status_code == 200: return parse_date(br.json().get("created"))
-              
-              # History
-              if "history" in d:
-                  import json
-                  v1 = json.loads(d["history"][0]["v1Compatibility"])
-                  return parse_date(v1.get("created"))
-          except Exception as e: print(e)
-          return None
+              # Auth setup
+              if self.is_ghcr:
+                  self.token = self.get_ghcr_token()
+              elif self.username and self.password:
+                  self.token = self.get_auth_token()
+              else:
+                  self.token = None # Fallback or public
 
-      upstream = "ublue-os/bazzite-dx-nvidia"
-      local = "fptbb/agate"
+              if self.token:
+                  self.session.headers.update({"Authorization": f"Bearer {self.token}"})
+              
+              self.session.headers.update({
+                  "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
+              })
+
+          def get_ghcr_token(self):
+              try:
+                  url = f"https://ghcr.io/token?scope=repository:{self.repo}:pull"
+                  return requests.get(url).json()["token"]
+              except Exception as e:
+                  logger.warning(f"Failed GHCR fetch token: {e}")
+                  return None
+
+          def get_auth_token(self):
+              scope = f"repository:{self.repo}:pull"
+              service = self.registry
+              auth_url = f"https://{self.registry}/v2/auth?service={service}&scope={scope}"
+              try:
+                  # Basic Auth to get Token
+                  resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
+                  if resp.status_code != 200:
+                      logger.error(f"Auth failed {self.registry}: {resp.status_code} {resp.text}")
+                      return None
+                  return resp.json().get("token")
+              except Exception as e:
+                  logger.error(f"Auth error {self.registry}: {e}")
+                  return None
+
+          def parse_date(self, date_str):
+              try:
+                  date_str = date_str.replace("Z", "+00:00")
+                  if "." in date_str and "+" in date_str:
+                      main, tz = date_str.split("+")
+                      date_str = f"{main[:26]}+{tz}"
+                  return datetime.fromisoformat(date_str)
+              except: return None
+
+          def get_created_date(self, tag):
+              url = f"{self.base_url}/{self.repo}/manifests/{tag}"
+              try:
+                  resp = self.session.get(url)
+                  if resp.status_code != 200:
+                      logger.error(f"Manifest fetch failed {self.registry}/{self.repo}:{tag} - {resp.status_code}")
+                      return None
+                  
+                  manifest = resp.json()
+                  dt = None
+
+                  # Recursive for lists
+                  if "manifests" in manifest:
+                      sub_digest = manifest["manifests"][0]["digest"]
+                      # Fetch sub-manifest
+                      resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{sub_digest}")
+                      if resp.status_code == 200:
+                          manifest = resp.json()
+
+                  # Try config blob
+                  if "config" in manifest:
+                      cfg_digest = manifest["config"].get("digest")
+                      if cfg_digest:
+                          resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}")
+                          if resp.status_code == 200:
+                              dt = self.parse_date(resp.json().get("created"))
+                  
+                  # Try history
+                  if not dt and "history" in manifest:
+                      v1 = json.loads(manifest["history"][0]["v1Compatibility"])
+                      dt = self.parse_date(v1.get("created"))
+                      
+                  return dt
+              except Exception as e:
+                  logger.error(f"Error fetching date {self.registry}: {e}")
+                  return None
+
+      # Config
+      upstream_image = "ublue-os/bazzite-dx-nvidia"
+      local_image = "fptbb/agate"
       user = os.environ.get("BB_USERNAME")
       pwd = os.environ.get("BB_PASSWORD")
 
-      print(f"Checking {upstream} vs {local}...")
-      ud = get_date("ghcr.io", upstream, "latest")
-      ld = get_date("quay.io", local, "latest", user, pwd)
+      logger.info(f"Checking Upstream: ghcr.io/{upstream_image}")
+      upstream_client = ImageCheck("ghcr.io", upstream_image, is_ghcr=True)
+      ud = upstream_client.get_created_date("latest")
 
-      if not ud or not ld:
-          print("Could not fetch dates. Proceeding to build to be safe.")
+      logger.info(f"Checking Local: quay.io/{local_image}")
+      local_client = ImageCheck("quay.io", local_image, username=user, password=pwd)
+      ld = local_client.get_created_date("latest")
+
+      if not ud:
+          logger.error("Could not fetch upstream date.")
+          # Fail safe -> Build
+          sys.exit(0)
+      
+      if not ld:
+          logger.warning("Could not fetch local date. Assuming first build.")
+          # Fail safe -> Build
           sys.exit(0)
 
-      print(f"Upstream: {ud}")
-      print(f"Local:    {ld}")
+      logger.info(f"Upstream Date: {ud}")
+      logger.info(f"Local Date:    {ld}")
 
       if ud > ld:
-          print("Update available. Proceeding.")
+          logger.info("Update Available. Proceeding to build.")
           sys.exit(0)
       else:
-          print("System is up to date.")
+          logger.info("System is up to date. Stopping pipeline.")
           sys.exit(1)
       '
 
