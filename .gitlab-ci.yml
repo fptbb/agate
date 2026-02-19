@@ -22,6 +22,9 @@ check-update:
   image: python:3-alpine
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
+  artifacts:
+    reports:
+      dotenv: build.env
   script:
     - pip install requests
     - |
@@ -172,11 +175,15 @@ check-update:
       if not ud:
           logger.error("Could not fetch upstream date.")
           # Fail safe -> Build
+          with open("build.env", "w") as f:
+              f.write("FORCE_BUILD=true")
           sys.exit(0)
       
       if not ld:
           logger.warning("Could not fetch local date. Assuming first build.")
           # Fail safe -> Build
+          with open("build.env", "w") as f:
+              f.write("FORCE_BUILD=true")
           sys.exit(0)
 
       logger.info(f"Upstream Date: {ud}")
@@ -185,15 +192,23 @@ check-update:
       if ud > ld:
           logger.info("Update Available. Proceeding to build.")
           send_notification(ud, ld)
+          with open("build.env", "w") as f:
+              f.write("FORCE_BUILD=true")
           sys.exit(0)
       else:
           logger.info("System is up to date. Stopping pipeline.")
-          sys.exit(1)
+          with open("build.env", "w") as f:
+              f.write("FORCE_BUILD=false")
+          sys.exit(0)
       '
 
 
 build-image:
   stage: build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
+      when: never
+    - when: on_success
   tags:
     - saas-linux-2xlarge-amd64
   image:
@@ -229,6 +244,8 @@ publish-metadata:
     REGCTL_VERSION: v0.5.0
     DEST_REPO: "quay.io/fptbb/agate:artifacthub.io"
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
   before_script:
@@ -252,6 +269,10 @@ publish-metadata:
 
 cleanup-old-tags:
   stage: cleanup
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
+      when: never
+    - when: on_success
   image: python:3-alpine
   variables:
     IMAGE_NAME: agate
