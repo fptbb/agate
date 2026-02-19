@@ -2,6 +2,7 @@
 
 [![Build Status](https://gitlab.com/fpsys/agate/badges/main/pipeline.svg?ignore_skipped=true&key_text=CI%20Pipeline)](https://gitlab.com/fpsys/agate/-/pipelines)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate)](https://artifacthub.io/packages/search?repo=agate)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate-alt)](https://artifacthub.io/packages/search?repo=agate-alt)
 
 **Website: [os.fpt.icu](https://os.fpt.icu)**
 
@@ -43,6 +44,10 @@ You can switch an existing `bootc`-compatible system (like Fedora, Bazzite, or B
 **Rebase Command:**
 ```bash
 sudo rpm-ostree rebase ostree-image-signed:docker://quay.io/fptbb/agate:latest
+```
+or, as an alternative mirror, use Github
+```bash
+sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/fptbb/agate:latest
 ```
 After the command completes, reboot your system. You can check the status at any time with `sudo bootc status`.
 
