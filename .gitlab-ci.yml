@@ -11,10 +11,91 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
 stages:
+  - check
   - build
   - publish
   - deploy
   - cleanup
+
+check-update:
+  stage: check
+  image: python:3-alpine
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - pip install requests
+    - |
+      python3 -c '
+      import os, sys, requests, datetime
+      from datetime import datetime
+      
+      def parse_date(d):
+          try:
+              d = d.replace("Z", "+00:00")
+              if "." in d and "+" in d:
+                  main, tz = d.split("+")
+                  d = f"{main[:26]}+{tz}"
+              return datetime.fromisoformat(d)
+          except: return None
+
+      def get_token(registry, repo):
+          try:
+              if registry == "ghcr.io":
+                  return requests.get(f"https://ghcr.io/token?scope=repository:{repo}:pull").json()["token"]
+          except: pass
+          return None
+
+      def get_date(registry, repo, tag, user=None, pwd=None):
+          headers = {"Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"}
+          if registry == "ghcr.io":
+              t = get_token(registry, repo)
+              if t: headers["Authorization"] = f"Bearer {t}"
+          elif user and pwd:
+              headers["Authorization"] = requests.auth._basic_auth_str(user, pwd)
+          
+          try:
+              r = requests.get(f"https://{registry}/v2/{repo}/manifests/{tag}", headers=headers)
+              if r.status_code != 200: return None
+              d = r.json()
+              
+              # Config Blob
+              cd = d.get("config", {}).get("digest")
+              if cd:
+                  br = requests.get(f"https://{registry}/v2/{repo}/blobs/{cd}", headers=headers)
+                  if br.status_code == 200: return parse_date(br.json().get("created"))
+              
+              # History
+              if "history" in d:
+                  import json
+                  v1 = json.loads(d["history"][0]["v1Compatibility"])
+                  return parse_date(v1.get("created"))
+          except Exception as e: print(e)
+          return None
+
+      upstream = "ublue-os/bazzite-dx-nvidia"
+      local = "fptbb/agate"
+      user = os.environ.get("BB_USERNAME")
+      pwd = os.environ.get("BB_PASSWORD")
+
+      print(f"Checking {upstream} vs {local}...")
+      ud = get_date("ghcr.io", upstream, "latest")
+      ld = get_date("quay.io", local, "latest", user, pwd)
+
+      if not ud or not ld:
+          print("Could not fetch dates. Proceeding to build to be safe.")
+          sys.exit(0)
+
+      print(f"Upstream: {ud}")
+      print(f"Local:    {ld}")
+
+      if ud > ld:
+          print("Update available. Proceeding.")
+          sys.exit(0)
+      else:
+          print("System is up to date.")
+          sys.exit(1)
+      '
+
 
 build-image:
   stage: build
