@@ -83,7 +83,7 @@ To customize this image or build it yourself locally, you can use the provided `
     The generated images will be in the root directory.
 
 ## Verification
-These images are signed with [Sigstore](https://www.sigstore.dev/)'s [cosign](https://github.com/sigstore/cosign). You can verify the signature by downloading the `cosign.pub` file from this repo and running:
+These images are signed with [Sigstore](https://www.sigstore.dev/)'s [cosign](https://github.com/sigstore/cosign). You can verify the signature by downloading the `cosign.pub` file [here](assets/cosign.pub) and running:
 
 ```bash
 cosign verify --key https://os.fpt.icu/cosign.pub quay.io/fptbb/agate
