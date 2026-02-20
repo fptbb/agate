@@ -23,6 +23,9 @@ jobs:
   check-update:
     name: Check for updates
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     outputs:
       needs-update: ${{ steps.check.outputs.needs_update }}
     steps:
@@ -80,10 +83,17 @@ jobs:
 
               def get_auth_token_ghcr(self):
                   import base64
-                  # GHCR uses base64(username:token) for basic auth directly on v2
                   auth_str = f"{self.username}:{self.password}"
                   b64_auth = base64.b64encode(auth_str.encode()).decode()
-                  return base64.b64encode(auth_str.encode()).decode()
+                  try:
+                      url = f"https://ghcr.io/token?scope=repository:{self.repo}:pull"
+                      resp = requests.get(url, headers={"Authorization": f"Basic {b64_auth}"})
+                      if resp.status_code == 200:
+                          return resp.json()["token"]
+                      logger.error(f"Failed GHCR auth fetch token: {resp.status_code} {resp.text}")
+                  except Exception as e:
+                      logger.error(f"Failed GHCR auth fetch token: {e}")
+                  return None
 
               def parse_date(self, date_str):
                   try:
@@ -97,12 +107,6 @@ jobs:
               def get_created_date(self, tag):
                   url = f"{self.base_url}/{self.repo}/manifests/{tag}"
                   auth_headers = self.session.headers.copy()
-                  
-                  if self.username and self.password:
-                      import base64
-                      auth_str = f"{self.username}:{self.password}"
-                      b64_auth = base64.b64encode(auth_str.encode()).decode()
-                      auth_headers["Authorization"] = f"Basic {b64_auth}"
 
                   try:
                       resp = requests.get(url, headers=auth_headers)
