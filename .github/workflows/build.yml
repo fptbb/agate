@@ -14,6 +14,11 @@ concurrency:
   # only run one build at a time
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
+
+env:
+  IMAGE_NAME: "agate"
+  REGISTRY: "ghcr.io"
+
 jobs:
   bluebuild:
     name: Build Custom Image
@@ -39,21 +44,21 @@ jobs:
           pr_event_number: ${{ github.event.number }}
           build_opts: --build-driver=podman --run-driver=podman
           use_cache: true
-          rechunk: false
+          build_chunked_oci: true
 
           maximize_build_space: false
 
       - name: Install ORAS
         uses: oras-project/setup-oras@v1
 
-      - name: Login to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Login to Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Publish Artifact Hub Manifest
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           oras push \
-            ghcr.io/$REPO_OWNER/agate:artifacthub.io \
+            ${{ env.REGISTRY }}/$REPO_OWNER/${{ env.IMAGE_NAME }}:artifacthub.io \
             --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
             artifacthub-repo-gh.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml

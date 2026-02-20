@@ -10,6 +10,21 @@ workflow:
     # Daily Builds
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
+variables:
+  IMAGE_NAME: "agate"
+  UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
+  UPSTREAM_REGISTRY: "ghcr.io"
+
+.anchors:
+  skip-unforced: &skip-unforced
+    if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
+    when: never
+
+.python-job:
+  image: python:3-alpine
+  before_script:
+    - pip install requests
+
 stages:
   - check
   - build
@@ -18,15 +33,14 @@ stages:
   - cleanup
 
 check-update:
+  extends: .python-job
   stage: check
-  image: python:3-alpine
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   artifacts:
     reports:
       dotenv: build.env
   script:
-    - pip install requests
     - |
       python3 -c '
       import os, sys, requests, datetime, json, logging, smtplib, ssl
@@ -159,17 +173,21 @@ check-update:
                   return None
 
       # Config
-      upstream_image = "ublue-os/bazzite-dx-nvidia"
-      local_image = "fptbb/agate"
+      upstream_image = os.environ.get("UPSTREAM_IMAGE", "ublue-os/bazzite-dx-nvidia")
+      upstream_registry = os.environ.get("UPSTREAM_REGISTRY", "ghcr.io")
+      namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
+      image_name = os.environ.get("IMAGE_NAME", "agate")
+      local_image = f"{namespace}/{image_name}"
+      registry = os.environ.get("BB_REGISTRY", "quay.io")
       user = os.environ.get("BB_USERNAME")
       pwd = os.environ.get("BB_PASSWORD")
 
-      logger.info(f"Checking Upstream: ghcr.io/{upstream_image}")
-      upstream_client = ImageCheck("ghcr.io", upstream_image, is_ghcr=True)
+      logger.info(f"Checking Upstream: {upstream_registry}/{upstream_image}")
+      upstream_client = ImageCheck(upstream_registry, upstream_image, is_ghcr=("ghcr.io" in upstream_registry.lower()))
       ud = upstream_client.get_created_date("latest")
 
-      logger.info(f"Checking Local: quay.io/{local_image}")
-      local_client = ImageCheck("quay.io", local_image, username=user, password=pwd)
+      logger.info(f"Checking Local: {registry}/{local_image}")
+      local_client = ImageCheck(registry, local_image, username=user, password=pwd)
       ld = local_client.get_created_date("latest")
 
       if not ud:
@@ -206,8 +224,7 @@ check-update:
 build-image:
   stage: build
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
-      when: never
+    - *skip-unforced
     - when: on_success
   tags:
     - saas-linux-2xlarge-amd64
@@ -234,7 +251,7 @@ build-image:
     - docker login $BB_REGISTRY -u $BB_USERNAME -p $BB_PASSWORD
   script:
     - sleep 5 # Wait a bit for the docker-in-docker service to start
-    - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/agate"
+    - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
     - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
 
 publish-metadata:
@@ -242,17 +259,16 @@ publish-metadata:
   image: alpine:latest
   variables:
     REGCTL_VERSION: v0.5.0
-    DEST_REPO: "quay.io/fptbb/agate:artifacthub.io"
+    DEST_REPO: "$BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME:artifacthub.io"
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
-      when: never
+    - *skip-unforced
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
   before_script:
     - apk add --no-cache curl
     - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
     - chmod +x /usr/local/bin/regctl
-    - echo "$BB_PASSWORD" | regctl registry login quay.io -u "$BB_USERNAME" --pass-stdin
+    - echo "$BB_PASSWORD" | regctl registry login $BB_REGISTRY -u "$BB_USERNAME" --pass-stdin
   script:
     - |
       if [ ! -f "artifacthub-repo.yml" ]; then
@@ -268,19 +284,16 @@ publish-metadata:
         $DEST_REPO
 
 cleanup-old-tags:
+  extends: .python-job
   stage: cleanup
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
-      when: never
+    - *skip-unforced
     - when: on_success
-  image: python:3-alpine
   variables:
-    IMAGE_NAME: agate
     MAX_AGE_DAYS: "7"
     MAX_KEEP: "5"
     DRY_RUN: "false"
   script:
-    - pip install requests
     - |
       python3 -c '
       import os
@@ -296,9 +309,9 @@ cleanup-old-tags:
 
       class DockerV2Cleaner:
           def __init__(self):
-              self.registry = "quay.io"
+              self.registry = os.environ.get("BB_REGISTRY", "quay.io")
               namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
-              image = os.environ.get("IMAGE_NAME")
+              image = os.environ.get("IMAGE_NAME", "agate")
               self.repo = f"{namespace}/{image}"
               self.username = os.environ.get("BB_USERNAME")
               self.password = os.environ.get("BB_PASSWORD")
@@ -318,7 +331,7 @@ cleanup-old-tags:
 
           def get_auth_token(self):
               scope = f"repository:{self.repo}:pull,push"
-              auth_url = f"https://{self.registry}/v2/auth?service=quay.io&scope={scope}"
+              auth_url = f"https://{self.registry}/v2/auth?service={self.registry}&scope={scope}"
               try:
                   resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
                   if resp.status_code != 200: sys.exit(1)
