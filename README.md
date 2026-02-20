@@ -68,7 +68,7 @@ To customize this image or build it yourself locally, you can use the provided `
 ### Build Instructions
 1.  **Clone the repository:**
     ```bash
-    git clone git@github.com:fptbb/agate.git
+    git clone git@gitlab.com:fpsys/agate.git
     cd agate
     ```
 2.  **Build the container image:**

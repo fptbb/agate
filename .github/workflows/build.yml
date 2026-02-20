@@ -20,6 +20,7 @@ env:
 jobs:
   check-update:
     name: Check for updates
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -212,9 +213,11 @@ jobs:
   bluebuild:
     name: Build Custom Image
     needs: check-update
-    # Only build on push to main (which forces a build regardless of date via check-update logic evaluating to true), 
-    # OR if check-update explicitly outputs true.
-    if: needs.check-update.outputs.needs-update == 'true'
+    # Only build on push/manual (which skips check-update), OR if check-update explicitly outputs true.
+    # use always() to ensure it runs even if check-update is skipped.
+    if: |
+      always() && 
+      (needs.check-update.result == 'skipped' || needs.check-update.outputs.needs-update == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
