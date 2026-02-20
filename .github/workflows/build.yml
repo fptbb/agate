@@ -51,20 +51,20 @@ jobs:
           class ImageCheck:
               def __init__(self, registry, repo, username=None, password=None, is_ghcr=False):
                   self.registry = registry
-                  self.repo = repo.lower()
+                  self.repo = repo
                   self.username = username
                   self.password = password
                   self.is_ghcr = is_ghcr
                   self.session = requests.Session()
                   self.base_url = f"https://{self.registry}/v2"
                   
-                  if self.is_ghcr and self.password:
-                      # If we have a password, we can use it to get a token via Docker API
-                      self.token = self.get_auth_token_ghcr()
-                  elif self.is_ghcr:
-                      self.token = self.get_ghcr_token_public()
+                  # Auth setup
+                  if self.is_ghcr:
+                      self.token = self.get_ghcr_token()
+                  elif self.username and self.password:
+                      self.token = self.get_auth_token()
                   else:
-                      self.token = None # Fallback
+                      self.token = None # Fallback or public
 
                   if self.token:
                       self.session.headers.update({"Authorization": f"Bearer {self.token}"})
@@ -73,27 +73,29 @@ jobs:
                       "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
                   })
 
-              def get_ghcr_token_public(self):
+              def get_ghcr_token(self):
                   try:
                       url = f"https://ghcr.io/token?scope=repository:{self.repo}:pull"
                       return requests.get(url).json()["token"]
                   except Exception as e:
-                      logger.warning(f"Failed GHCR public fetch token: {e}")
+                      logger.warning(f"Failed GHCR fetch token: {e}")
                       return None
 
-              def get_auth_token_ghcr(self):
-                  import base64
-                  auth_str = f"{self.username}:{self.password}"
-                  b64_auth = base64.b64encode(auth_str.encode()).decode()
+              def get_auth_token(self):
+                  from requests.auth import HTTPBasicAuth
+                  scope = f"repository:{self.repo}:pull"
+                  service = self.registry
+                  auth_url = f"https://{self.registry}/v2/auth?service={service}&scope={scope}"
                   try:
-                      url = f"https://ghcr.io/token?scope=repository:{self.repo}:pull"
-                      resp = requests.get(url, headers={"Authorization": f"Basic {b64_auth}"})
-                      if resp.status_code == 200:
-                          return resp.json()["token"]
-                      logger.error(f"Failed GHCR auth fetch token: {resp.status_code} {resp.text}")
+                      # Basic Auth to get Token
+                      resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
+                      if resp.status_code != 200:
+                          logger.error(f"Auth failed {self.registry}: {resp.status_code} {resp.text}")
+                          return None
+                      return resp.json().get("token")
                   except Exception as e:
-                      logger.error(f"Failed GHCR auth fetch token: {e}")
-                  return None
+                      logger.error(f"Auth error {self.registry}: {e}")
+                      return None
 
               def parse_date(self, date_str):
                   try:
@@ -106,12 +108,10 @@ jobs:
 
               def get_created_date(self, tag):
                   url = f"{self.base_url}/{self.repo}/manifests/{tag}"
-                  auth_headers = self.session.headers.copy()
-
                   try:
-                      resp = requests.get(url, headers=auth_headers)
+                      resp = self.session.get(url)
                       if resp.status_code != 200:
-                          logger.error(f"Manifest fetch failed {self.registry}/{self.repo}:{tag} - {resp.status_code} - {resp.text}")
+                          logger.error(f"Manifest fetch failed {self.registry}/{self.repo}:{tag} - {resp.status_code}")
                           return None
                       
                       manifest = resp.json()
@@ -121,7 +121,7 @@ jobs:
                       if "manifests" in manifest:
                           sub_digest = manifest["manifests"][0]["digest"]
                           # Fetch sub-manifest
-                          resp = requests.get(f"{self.base_url}/{self.repo}/manifests/{sub_digest}", headers=auth_headers)
+                          resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{sub_digest}")
                           if resp.status_code == 200:
                               manifest = resp.json()
 
@@ -129,7 +129,7 @@ jobs:
                       if "config" in manifest:
                           cfg_digest = manifest["config"].get("digest")
                           if cfg_digest:
-                              resp = requests.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}", headers=auth_headers)
+                              resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}")
                               if resp.status_code == 200:
                                   dt = self.parse_date(resp.json().get("created"))
                       
@@ -160,9 +160,30 @@ jobs:
           upstream_client = ImageCheck(upstream_registry, upstream_image, is_ghcr=("ghcr.io" in upstream_registry.lower()))
           ud = upstream_client.get_created_date("latest")
 
-          logger.info(f"Checking Local: {registry}/{local_image}")
-          local_client = ImageCheck(registry, local_image, username=user, password=token, is_ghcr=("ghcr.io" in registry.lower()))
-          ld = local_client.get_created_date("latest")
+          logger.info(f"Checking Local (GitHub API): {user}/{image_name}")
+          
+          # Use GitHub REST API for local ghcr.io packages to bypass OCI Index 404s
+          ld = None
+          try:
+              api_url = f"https://api.github.com/users/{user}/packages/container/{image_name}/versions"
+              headers = {"Accept": "application/vnd.github.v3+json"}
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+                  
+              resp = requests.get(api_url, headers=headers)
+              if resp.status_code == 200:
+                  versions = resp.json()
+                  for v in versions:
+                      if "latest" in v.get("metadata", {}).get("container", {}).get("tags", []):
+                          date_str = v.get("created_at")
+                          if date_str:
+                              # Re-use the ImageCheck parse_date method (instantiate temporarily, or use upstream client)
+                              ld = upstream_client.parse_date(date_str)
+                          break
+              else:
+                  logger.error(f"GitHub API fetch failed: {resp.status_code} - {resp.text}")
+          except Exception as e:
+              logger.error(f"Error fetching local date via GitHub API: {e}")
 
           # If this is not a schedule event, force a build
           event_name = os.environ.get("GITHUB_EVENT_NAME")
