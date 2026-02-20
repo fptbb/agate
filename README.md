@@ -10,18 +10,18 @@
 
 ## Introduction
 
-Welcome to Agate! This project is a customized, bootable OS image based on [Bazzite](https://bazzite.gg/) (a Fedora KDE variant), built using the [BlueBuild](https://blue-build.org/).
+Welcome to Agate! This project is a customized, bootable OS image based on [Bazzite](https://bazzite.gg/) (a Fedora KDE variant), built using [BlueBuild](https://blue-build.org/).
 
-While this is my personal daily driver OS, tailored to my specific workflow and preferences, it's also publicly available as a learning resource or a starting point for your own custom OS image. You can see how certain customizations are made, fork the project to suit your needs, or just draw inspiration for your own builds.
+While this is my personal daily driver OS, tailored to my specific workflow and preferences, it is publicly available as a learning resource or a starting point for your own custom OS. You can see how specific customizations are layered onto Bazzite, fork the project to suit your needs, or draw inspiration for your own immutable builds.
 
-**Disclaimer:** This project includes personal branding and specific configurations that may not be suitable for everyone. It is recommended to review the customizations before use.
+**Disclaimer:** This project includes personal branding and specific configurations that may not be suitable for everyone. Review the customizations carefully before adopting.
 
 ## Core Concept
 
-*   **Base Image:** `ghcr.io/ublue-os/bazzite-dx-nvidia:stable`. This provides a solid foundation of Fedora Kinoite (KDE Plasma) with Bazzite's gaming enhancements, developer experience tools, and pre-installed Nvidia drivers.
-*   **Immutable & Atomic:** Leveraging `bootc` and `ostree`, the system is reliable, predictable, and robust. Updates are atomic, and you can easily roll back to previous versions.
-*   **Customized:** The base image is augmented with personal branding, system tweaks, additional packages, and my preferred set of Flatpaks.
-*   **Flatpak-centric:** Most applications are intended to be installed as Flatpaks. The base image modifications are for tools, system-level configurations, and packages that are not suitable for Flatpak.
+*   **Base Image:** `ghcr.io/ublue-os/bazzite-dx-nvidia:latest`. This provides a solid foundation of Fedora Kinoite (KDE Plasma) with Bazzite's gaming enhancements, developer tools, and pre-installed Nvidia drivers.
+*   **Immutable & Atomic:** Leveraging `bootc` and `ostree`, the system is reliable, predictable, and robust. Updates are atomic, and you can easily roll back to previous states.
+*   **Customized Layering:** The base image is augmented with personal branding, additional development packages, custom copr repos, and an expansive set of pre-installed Flatpaks.
+*   **Flatpak-Centric:** Most user-facing applications are installed as Flatpaks at build-time.
 
 ## Features & Customizations
 
@@ -30,16 +30,22 @@ While this is my personal daily driver OS, tailored to my specific workflow and 
 *   **Enabled Services:** The following services are enabled by default: `nordvpnd`, `tailscaled`, `netbird`, and `podman.socket`.
 *   **Disabled Services:** `NetworkManager-wait-online.service` is disabled to speed up boot times.
 *   **Nix Pkgs Manager:** Nix Pkgs are ready to be installed using `just agate-nixpkgs`.
+*   **Enabled Services:** Hardened networking and tracking via `whatpulse`, and `opensnitch` application firewall natively enabled out of the box.
+*   **Copr Repositories:** Leverages external coprs for tools like `yadm`, `VeraCrypt`, and `linuxtoys`.
 
 ### Included RPM Packages
-In addition to the standard Bazzite set, a variety of packages are installed for development (VS Code, Go, buildah), networking (NordVPN, Tailscale, Netbird), system utilities (yadm, kitty, zsh), and many more.
+In addition to the standard Bazzite offering, Agate directly layers on heavy development, packaging, and debugging tools, for things like development, networking (mostly dependencies for opensnitch and whatpulse), utilities, and integrations.
 
-### Default Flatpaks
-Comes with a curated selection of default applications including Bitwarden, Spotify, Vesktop (a Discord client), GIMP, Thunderbird, Mission Center, and many more. To be installed on the first start by the system.
+### Pre-Installed System Flatpaks
+Agate ships with a curated selection of default applications installed directly to the system space, including:
+*   **Web & Comm:** Zen Browser (`app.zen_browser.zen`), Thunderbird, Discord/Vesktop alternative clients.
+*   **Gaming:** Ryujinx, PrismLauncher, MCPE Launcher, Sober, Vinegar, Heroic Games Launcher, Bottles.
+*   **Development & Setup:** Podman Desktop, QtCreator, Insomnia, Gitnuro, Obsidian.
+*   **Media & Production:** OBS Studio, GIMP, Audacity, Spotify.
 
 ## How to Use
 
-You can switch an existing `bootc`-compatible system (like Fedora, Bazzite, or Bluefin) to this image.
+You can switch an existing `bootc`-compatible system to this custom image.
 
 **Rebase Command:**
 ```bash
@@ -53,7 +59,7 @@ After the command completes, reboot your system. You can check the status at any
 
 ## Building from Source
 
-If you want to customize this image or build it yourself, you can use the provided `Justfile`.
+To customize this image or build it yourself locally, you can use the provided `Justfile`.
 
 ### Prerequisites
 *   A container runtime like [Podman](https://podman.io/).
@@ -63,7 +69,7 @@ If you want to customize this image or build it yourself, you can use the provid
 1.  **Clone the repository:**
     ```bash
     git clone git@github.com:fptbb/agate.git
-    cd fp-os
+    cd agate
     ```
 2.  **Build the container image:**
     ```bash
@@ -72,14 +78,12 @@ If you want to customize this image or build it yourself, you can use the provid
 3.  **(Optional) Build a bootable disk image:**
     You can create an ISO, QCOW2, or other disk image formats.
     ```bash
-    # Build an ISO for installation
     just build-iso
     ```
     The generated images will be in the root directory.
 
 ## Verification
-
-These images are signed with [Sigstore](https://www.sigstore.dev/)'s [cosign](https://github.com/sigstore/cosign). You can verify the signature by downloading the `cosign.pub` file from this repo and running the following command:
+These images are signed with [Sigstore](https://www.sigstore.dev/)'s [cosign](https://github.com/sigstore/cosign). You can verify the signature by downloading the `cosign.pub` file from this repo and running:
 
 ```bash
 cosign verify --key https://os.fpt.icu/cosign.pub quay.io/fptbb/agate
@@ -98,7 +102,6 @@ This project is made possible by the work of the open-source community. Special 
 
 *   The [Universal Blue](https://universal-blue.org/) project and all its contributors.
 *   The [BlueBuild](https://blue-build.org/) project and all its contributors.
-*   The creators of the base images and templates.
 *   Inspiration from other custom OS projects like [VeneOS](https://github.com/Venefilyn/veneos), [amyos](https://github.com/astrovm/amyos), and [m2os](https://github.com/m2Giles/m2os).
 
 ## License
