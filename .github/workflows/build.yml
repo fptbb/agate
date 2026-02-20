@@ -20,8 +20,176 @@ env:
   REGISTRY: "ghcr.io"
 
 jobs:
+  check-update:
+    name: Check for updates
+    runs-on: ubuntu-latest
+    outputs:
+      needs-update: ${{ steps.check.outputs.needs_update }}
+    steps:
+      - name: Check if update is needed
+        id: check
+        shell: bash
+        env:
+          UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
+          UPSTREAM_REGISTRY: "ghcr.io"
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          REGISTRY: ${{ env.REGISTRY }}
+          USERNAME: ${{ github.repository_owner }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip install requests
+          python3 -c '
+          import os, sys, requests, datetime, json, logging
+          from datetime import datetime, timezone
+
+          logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+          logger = logging.getLogger(__name__)
+
+          class ImageCheck:
+              def __init__(self, registry, repo, username=None, password=None, is_ghcr=False):
+                  self.registry = registry
+                  self.repo = repo.lower()
+                  self.username = username
+                  self.password = password
+                  self.is_ghcr = is_ghcr
+                  self.session = requests.Session()
+                  self.base_url = f"https://{self.registry}/v2"
+                  
+                  if self.is_ghcr and self.password:
+                      # If we have a password, we can use it to get a token via Docker API
+                      self.token = self.get_auth_token_ghcr()
+                  elif self.is_ghcr:
+                      self.token = self.get_ghcr_token_public()
+                  else:
+                      self.token = None # Fallback
+
+                  if self.token:
+                      self.session.headers.update({"Authorization": f"Bearer {self.token}"})
+                  
+                  self.session.headers.update({
+                      "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
+                  })
+
+              def get_ghcr_token_public(self):
+                  try:
+                      url = f"https://ghcr.io/token?scope=repository:{self.repo}:pull"
+                      return requests.get(url).json()["token"]
+                  except Exception as e:
+                      logger.warning(f"Failed GHCR public fetch token: {e}")
+                      return None
+
+              def get_auth_token_ghcr(self):
+                  import base64
+                  # GHCR uses base64(username:token) for basic auth directly on v2
+                  auth_str = f"{self.username}:{self.password}"
+                  b64_auth = base64.b64encode(auth_str.encode()).decode()
+                  return base64.b64encode(auth_str.encode()).decode()
+
+              def parse_date(self, date_str):
+                  try:
+                      date_str = date_str.replace("Z", "+00:00")
+                      if "." in date_str and "+" in date_str:
+                          main, tz = date_str.split("+")
+                          date_str = f"{main[:26]}+{tz}"
+                      return datetime.fromisoformat(date_str)
+                  except: return None
+
+              def get_created_date(self, tag):
+                  url = f"{self.base_url}/{self.repo}/manifests/{tag}"
+                  auth_headers = self.session.headers.copy()
+                  
+                  if self.username and self.password:
+                      import base64
+                      auth_str = f"{self.username}:{self.password}"
+                      b64_auth = base64.b64encode(auth_str.encode()).decode()
+                      auth_headers["Authorization"] = f"Basic {b64_auth}"
+
+                  try:
+                      resp = requests.get(url, headers=auth_headers)
+                      if resp.status_code != 200:
+                          logger.error(f"Manifest fetch failed {self.registry}/{self.repo}:{tag} - {resp.status_code} - {resp.text}")
+                          return None
+                      
+                      manifest = resp.json()
+                      dt = None
+
+                      # Recursive for lists
+                      if "manifests" in manifest:
+                          sub_digest = manifest["manifests"][0]["digest"]
+                          # Fetch sub-manifest
+                          resp = requests.get(f"{self.base_url}/{self.repo}/manifests/{sub_digest}", headers=auth_headers)
+                          if resp.status_code == 200:
+                              manifest = resp.json()
+
+                      # Try config blob
+                      if "config" in manifest:
+                          cfg_digest = manifest["config"].get("digest")
+                          if cfg_digest:
+                              resp = requests.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}", headers=auth_headers)
+                              if resp.status_code == 200:
+                                  dt = self.parse_date(resp.json().get("created"))
+                      
+                      # Try history
+                      if not dt and "history" in manifest:
+                          v1 = json.loads(manifest["history"][0]["v1Compatibility"])
+                          dt = self.parse_date(v1.get("created"))
+                          
+                      return dt
+                  except Exception as e:
+                      logger.error(f"Error fetching date {self.registry}: {e}")
+                      return None
+
+          def set_output(name, value):
+              with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+                  print(f"{name}={value}", file=fh)
+
+          # Config
+          upstream_image = os.environ.get("UPSTREAM_IMAGE", "ublue-os/bazzite-dx-nvidia")
+          upstream_registry = os.environ.get("UPSTREAM_REGISTRY", "ghcr.io")
+          image_name = os.environ.get("IMAGE_NAME", "agate")
+          registry = os.environ.get("REGISTRY", "ghcr.io")
+          user = os.environ.get("USERNAME")
+          token = os.environ.get("TOKEN")
+          local_image = f"{user}/{image_name}"
+
+          logger.info(f"Checking Upstream: {upstream_registry}/{upstream_image}")
+          upstream_client = ImageCheck(upstream_registry, upstream_image, is_ghcr=("ghcr.io" in upstream_registry.lower()))
+          ud = upstream_client.get_created_date("latest")
+
+          logger.info(f"Checking Local: {registry}/{local_image}")
+          local_client = ImageCheck(registry, local_image, username=user, password=token, is_ghcr=("ghcr.io" in registry.lower()))
+          ld = local_client.get_created_date("latest")
+
+          # If this is not a schedule event, force a build
+          event_name = os.environ.get("GITHUB_EVENT_NAME")
+          
+          if not ud:
+              logger.error("Could not fetch upstream date. Building anyway.")
+              set_output("needs_update", "true")
+              sys.exit(0)
+          
+          if not ld:
+              logger.warning("Could not fetch local date. Assuming first build. Building anyway.")
+              set_output("needs_update", "true")
+              sys.exit(0)
+
+          logger.info(f"Upstream Date: {ud}")
+          logger.info(f"Local Date:    {ld}")
+
+          if ud > ld:
+              logger.info("Update Available. Proceeding to build.")
+              set_output("needs_update", "true")
+              sys.exit(0)
+          else:
+              logger.info("System is up to date. Stopping pipeline.")
+              set_output("needs_update", "false")
+              sys.exit(0)
+          '
+
   bluebuild:
     name: Build Custom Image
+    needs: check-update
+    if: github.event_name != 'schedule' || needs.check-update.outputs.needs-update == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -62,3 +230,176 @@ jobs:
             ${{ env.REGISTRY }}/$REPO_OWNER/${{ env.IMAGE_NAME }}:artifacthub.io \
             --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
             artifacthub-repo-gh.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
+
+  cleanup-old-tags:
+    name: Cleanup old tags
+    runs-on: ubuntu-latest
+    needs: bluebuild
+    if: always() # Run even if bluebuild fails or is skipped
+    permissions:
+      packages: write
+    steps:
+      - name: Cleanup old tags
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          USERNAME: ${{ github.repository_owner }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAX_AGE_DAYS: "7"
+          MAX_KEEP: "5"
+        run: |
+          pip install requests
+          python3 -c '
+          import os, sys, requests, logging
+          from datetime import datetime, timezone
+
+          logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+          logger = logging.getLogger(__name__)
+
+          class GitHubPackageCleaner:
+              def __init__(self):
+                  self.image_name = os.environ.get("IMAGE_NAME", "agate")
+                  self.username = os.environ.get("USERNAME")
+                  self.token = os.environ.get("TOKEN")
+                  
+                  if not all([self.image_name, self.username, self.token]):
+                      logger.error("Missing variables.")
+                      sys.exit(1)
+
+                  self.session = requests.Session()
+                  self.session.headers.update({
+                      "Authorization": f"token {self.token}",
+                      "Accept": "application/vnd.github.v3+json"
+                  })
+                  
+                  # GH REST API for packages
+                  # /user/packages/container/{package_name}/versions
+                  self.api_url = f"https://api.github.com/user/packages/container/{self.image_name}/versions"
+
+              def parse_date(self, date_str):
+                  try:
+                      date_str = date_str.replace("Z", "+00:00")
+                      return datetime.fromisoformat(date_str)
+                  except: return None
+
+              def get_all_versions(self):
+                  url = self.api_url + "?per_page=100"
+                  all_versions = []
+                  while url:
+                      try:
+                          resp = self.session.get(url)
+                          if resp.status_code != 200:
+                              logger.error(f"Failed to fetch versions: {resp.status_code} {resp.text}")
+                              break
+                          all_versions.extend(resp.json())
+                          
+                          # Pagination
+                          link = resp.headers.get("Link")
+                          url = None
+                          if link and "rel=\"next\"" in link:
+                              for part in link.split(","):
+                                  if "rel=\"next\"" in part:
+                                      url = part.split(";")[0].strip(" <>")
+                      except Exception as e:
+                          logger.error(f"Error fetching versions: {e}")
+                          break
+                  return all_versions
+
+              def delete_version(self, version_id, name):
+                  url = f"{self.api_url}/{version_id}"
+                  resp = self.session.delete(url)
+                  if resp.status_code == 204:
+                      logger.info(f"Deleted version ID {version_id} (tags: {name})")
+                      return True
+                  logger.error(f"Failed to delete {version_id}: {resp.status_code} {resp.text}")
+                  return False
+
+              def run(self):
+                  max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
+                  max_keep = int(os.environ.get("MAX_KEEP", 5))
+                  protected_tags = ["latest", "latest-cache"]
+
+                  logger.info(f"Scanning package {self.image_name}...")
+                  versions = self.get_all_versions()
+                  logger.info(f"Found {len(versions)} versions.")
+
+                  # Filter and sort
+                  version_data = []
+                  sig_data = []
+
+                  for v in versions:
+                      dt = self.parse_date(v["created_at"])
+                      if not dt: continue
+                      
+                      tags = v["metadata"]["container"]["tags"]
+                      
+                      # Identify signature files (they usually end with .sig)
+                      is_sig = any(t.endswith(".sig") for t in tags) if tags else False
+                      # Sometimes sigs are untagged in GHCR, identify them by lack of tags
+                      if not tags: is_sig = True 
+
+                      item = {
+                          "id": v["id"],
+                          "tags": tags,
+                          "date": dt,
+                          "digest": v["name"] # name is the sha256:... digest
+                      }
+
+                      if is_sig:
+                          sig_data.append(item)
+                      else:
+                          version_data.append(item)
+
+                  # Sort images newest first
+                  version_data.sort(key=lambda x: x["date"], reverse=True)
+
+                  active_digests = set()
+                  image_count = 0
+
+                  for item in version_data:
+                      tags = item["tags"]
+                      digest = item["digest"]
+                      age_days = (datetime.now(timezone.utc) - item["date"]).days
+                      should_keep = False
+
+                      # A: Protected Tags
+                      if any(t in protected_tags for t in tags):
+                          should_keep = True
+                      # B: Max Keep
+                      elif image_count < max_keep:
+                          should_keep = True
+                          image_count += 1
+                      # C: Young Age
+                      elif age_days <= max_age_days:
+                          should_keep = True
+
+                      if should_keep:
+                          active_digests.add(digest)
+
+                  logger.info(f"Analysis Complete. Keeping {len(active_digests)} images. Proceeding to cleanup.")
+
+                  # Delete non-active images
+                  for item in version_data:
+                      if item["digest"] not in active_digests:
+                          logger.info(f"Deleting expired image {item["digest"]} {item["tags"]}")
+                          self.delete_version(item["id"], item["tags"])
+                  
+                  # Delete orphaned signatures
+                  for item in sig_data:
+                      sig_tag = ""
+                      if item["tags"]:
+                          sig_tag = item["tags"][0]
+                          # Extract standard digest from sig tag format (sha256-.....sig)
+                          clean_digest = sig_tag.replace(".sig", "").replace("-", ":")
+                          if clean_digest not in active_digests:
+                              logger.info(f"Deleting orphaned signature {item["digest"]} {item["tags"]}")
+                              self.delete_version(item["id"], item["tags"])
+                      else:
+                           # Delete completely untagged signatures immediately
+                           logger.info(f"Deleting untagged signature {item["digest"]}")
+                           self.delete_version(item["id"], "untagged")
+
+          if __name__ == "__main__":
+              cleaner = GitHubPackageCleaner()
+              cleaner.run()
+          '
