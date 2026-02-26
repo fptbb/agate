@@ -68,6 +68,8 @@ modules:
         - winetricks # work around common problems in wine
         - dotnet-sdk-8.0 # .net 8.0 software development kit
         - inxi # a full featured system information script
+        - libfido2 # fido2 library for u2f support in browsers and other applications
+        - fido2-tools # command line tools for fido2 devices
         - python3-grpcio # dependency for opensnitch
         - python3-protobuf # dependency for opensnitch
         - python3-slugify # dependency for opensnitch
@@ -76,6 +78,7 @@ modules:
     scripts:
       - whatpulse.sh
       - opensnitch.sh
+      - fido2.sh
   - type: systemd
     system:
       enabled:
