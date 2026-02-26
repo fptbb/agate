@@ -3,6 +3,7 @@
 [![Build Status](https://gitlab.com/fpsys/agate/badges/main/pipeline.svg?ignore_skipped=true&key_text=CI%20Pipeline)](https://gitlab.com/fpsys/agate/-/pipelines)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate)](https://artifacthub.io/packages/search?repo=agate)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate-alt)](https://artifacthub.io/packages/search?repo=agate-alt)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fptbb/agate)
 
 **Website: [os.fpt.icu](https://os.fpt.icu)**
 
