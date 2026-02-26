@@ -55,7 +55,6 @@ agate-luks-setup: _agate-check-luks-deps
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # enforces root privileges
     if [ "$EUID" -ne 0 ]; then
         echo "error: permission denied. run with sudo."
         exit 1
@@ -67,7 +66,6 @@ agate-luks-setup: _agate-check-luks-deps
         exit 1
     fi
 
-    # extracts block device path via uuid
     DISK_UUID=$(echo "$CRYPT_LINE" | awk '{print $2}' | sed 's/UUID=//')
     DISK_PATH="/dev/disk/by-uuid/$DISK_UUID"
 
@@ -77,8 +75,7 @@ agate-luks-setup: _agate-check-luks-deps
     fi
 
     echo "luks device identified: $DISK_PATH"
-    
-    # initializes safety backups
+
     BACKUP_IMG="/root/luks-header-backup-${DISK_UUID}.img"
     if ! cryptsetup luksHeaderBackup "$DISK_PATH" --header-backup-file "$BACKUP_IMG"; then
         echo "error: luks header backup failed."
@@ -91,13 +88,11 @@ agate-luks-setup: _agate-check-luks-deps
 
     echo "insert yubikey. current luks password and fido2 pin will be requested..."
 
-    # registers hardware token in luks header
     if ! systemd-cryptenroll --fido2-device=auto --fido2-with-client-pin=yes "$DISK_PATH"; then
         echo "error: systemd-cryptenroll hardware registration failed."
         exit 1
     fi
 
-    # applies crypttab flag preventing duplicates
     if grep -q "fido2-device=auto" /etc/crypttab; then
         echo "info: fido2-device=auto is already present in /etc/crypttab."
     else
@@ -113,7 +108,6 @@ agate-luks-remove TARGET_DEV="": _agate-check-luks-deps
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # enforces root privileges
     if [ "$EUID" -ne 0 ]; then
         echo "error: permission denied. run with sudo."
         exit 1
@@ -121,10 +115,10 @@ agate-luks-remove TARGET_DEV="": _agate-check-luks-deps
 
     SELECTED_DEV="{{TARGET_DEV}}"
 
-    # handles interactive device selection if argument is empty
+    # handles interactive device selection
     if [ -z "$SELECTED_DEV" ]; then
         mapfile -t LUKS_DEVICES < <(blkid -t TYPE=crypto_LUKS -o device)
-        
+
         if [ ${#LUKS_DEVICES[@]} -eq 0 ]; then
             echo "error: no luks devices found."
             exit 1
@@ -136,11 +130,11 @@ agate-luks-remove TARGET_DEV="": _agate-check-luks-deps
             for i in "${!LUKS_DEVICES[@]}"; do
                 echo "$i) ${LUKS_DEVICES[$i]}"
             done
-            
+
             set +e
             read -p "select device index: " INDEX
             set -e
-            
+
             if [[ ! "$INDEX" =~ ^[0-9]+$ ]] || [ "$INDEX" -ge "${#LUKS_DEVICES[@]}" ]; then
                 echo "error: invalid selection."
                 exit 1
@@ -155,8 +149,7 @@ agate-luks-remove TARGET_DEV="": _agate-check-luks-deps
     fi
 
     echo "removing fido2 slots from $SELECTED_DEV..."
-    
-    # clears hardware token slots
+
     if ! systemd-cryptenroll --wipe-slot=fido2 "$SELECTED_DEV"; then
         echo "error: fido2 slot wipe failed."
         exit 1
@@ -173,31 +166,30 @@ agate-luks-remove TARGET_DEV="": _agate-check-luks-deps
 
     echo "removal complete."
 
-# manages interactive yubikey pam authentication for kde
+# manages interactive yubikey authentication
 [group("system")]
 agate-kde-setup: _agate-check-pam-deps
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # enforces root privileges
     if [ "$EUID" -ne 0 ]; then
         echo "error: permission denied. run with sudo."
         exit 1
     fi
 
-    # resolves actual user under sudo session
     REAL_USER=${SUDO_USER:-$USER}
     USER_HOME=$(eval echo ~$REAL_USER)
     YUBI_DIR="$USER_HOME/.config/Yubico"
     KEY_FILE="$YUBI_DIR/u2f_keys"
 
-    echo "=== kde yubikey management ==="
-    echo "1) enable pam-u2f authentication (requires pin, falls back to password)"
-    echo "2) disable pam-u2f authentication"
-    echo "3) register primary yubikey (overwrites current keys)"
-    echo "4) register additional yubikey"
-    echo "5) remove all registered yubikeys"
-    echo "6) exit"
+    echo "=== KDE YubiKey Management ==="
+    echo "1) Enable YubiKey everywhere (Login, Lockscreen, Sudo, App installations)"
+    echo "2) Enable YubiKey for the initial Login screen only (Recommended)"
+    echo "3) Disable YubiKey authentication completely"
+    echo "4) Register your primary YubiKey (Erases previous keys)"
+    echo "5) Register an additional YubiKey"
+    echo "6) Remove all registered YubiKeys"
+    echo "7) Exit"
 
     set +e
     read -p "choose an option: " OPTION
@@ -205,42 +197,95 @@ agate-kde-setup: _agate-check-pam-deps
 
     case $OPTION in
         1)
-            # injects pinverification flag into custom authselect profile
+            if [ ! -f "$KEY_FILE" ]; then
+                echo "error: yubikey mapping not found. run option 4 to register a key first."
+                exit 1
+            fi
+
+            # clears local gui edits
+            for APP in sddm kscreenlocker; do
+                PAM_FILE="/etc/pam.d/$APP"
+                if [ -f "$PAM_FILE" ]; then
+                    sed -i '/pam_u2f\.so/d' "$PAM_FILE"
+                fi
+            done
+
             authselect create-profile yubikey-custom -b local --symlink-meta || true
-            sed -i 's/pam_u2f.so cue/pam_u2f.so cue interactive pinverification=1/g' /etc/authselect/custom/yubikey-custom/*
-            
+            sed -i 's/pam_u2f.so cue/pam_u2f.so cue pinverification=1/g' /etc/authselect/custom/yubikey-custom/*
+
             authselect select custom/yubikey-custom with-silent-lastlog with-mdns4 with-fingerprint with-pam-u2f --force
-            echo "pam-u2f authentication enabled."
+            echo "global authentication enabled."
             ;;
         2)
-            # restores native local profile
+            if [ ! -f "$KEY_FILE" ]; then
+                echo "error: yubikey mapping not found. run option 4 to register a key first."
+                exit 1
+            fi
+
+            # reverts global authselect profile
             authselect select local with-silent-lastlog with-mdns4 with-fingerprint --force
-            echo "pam-u2f authentication disabled."
+            if [ -d "/etc/authselect/custom/yubikey-custom" ]; then
+                rm -rf /etc/authselect/custom/yubikey-custom
+            fi
+
+            # applies pin requirement exclusively to sddm
+            SDDM_RULE="auth sufficient pam_u2f.so cue interactive pinverification=1"
+            if [ ! -f "/etc/pam.d/sddm" ] && [ -f "/usr/lib/pam.d/sddm" ]; then
+                cp "/usr/lib/pam.d/sddm" "/etc/pam.d/sddm"
+            fi
+            if [ -f "/etc/pam.d/sddm" ]; then
+                sed -i '/pam_u2f\.so/d' "/etc/pam.d/sddm"
+                awk -v rule="$SDDM_RULE" '/^auth/ && !inserted {print rule; inserted=1} 1' "/etc/pam.d/sddm" > "/etc/pam.d/sddm.tmp"
+                mv "/etc/pam.d/sddm.tmp" "/etc/pam.d/sddm"
+                chmod 644 "/etc/pam.d/sddm"
+            fi
+
+            # ensures kscreenlocker is completely clean from previous configurations
+            if [ -f "/etc/pam.d/kscreenlocker" ]; then
+                sed -i '/pam_u2f\.so/d' "/etc/pam.d/kscreenlocker"
+            fi
+
+            echo "login screen authentication enabled."
+            echo "note: the kde lockscreen will continue to ask only for your standard password."
             ;;
         3)
-            # drops privileges to write mapping file
+            # clears local gui edits
+            for APP in sddm kscreenlocker; do
+                PAM_FILE="/etc/pam.d/$APP"
+                if [ -f "$PAM_FILE" ]; then
+                    sed -i '/pam_u2f\.so/d' "$PAM_FILE"
+                fi
+            done
+
+            authselect select local with-silent-lastlog with-mdns4 with-fingerprint --force
+            if [ -d "/etc/authselect/custom/yubikey-custom" ]; then
+                rm -rf /etc/authselect/custom/yubikey-custom
+            fi
+
+            echo "authentication disabled completely."
+            ;;
+        4)
             sudo -u "$REAL_USER" mkdir -p "$YUBI_DIR"
-            echo "touch your yubikey now..."
-            
+            echo "enter your fido2 pin if prompted, then touch your yubikey to register..."
+
             sudo -u "$REAL_USER" pamu2fcfg > "$KEY_FILE"
             echo "primary yubikey registered successfully."
             ;;
-        4)
+        5)
             if [ ! -f "$KEY_FILE" ]; then
-                echo "error: primary key missing. run option 3 first."
+                echo "error: primary key missing. run option 4 first."
                 exit 1
             fi
-            echo "touch your new yubikey now..."
-            
+            echo "enter your fido2 pin if prompted, then touch your new yubikey to register..."
+
             sudo -u "$REAL_USER" pamu2fcfg -n >> "$KEY_FILE"
             echo "additional yubikey registered."
             ;;
-        5)
-            # clears mapping file
+        6)
             sudo -u "$REAL_USER" rm -f "$KEY_FILE"
             echo "all keys have been removed."
             ;;
-        6)
+        7)
             exit 0
             ;;
         *)
