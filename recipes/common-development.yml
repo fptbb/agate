@@ -9,3 +9,5 @@ modules:
     validate: true
     include:
         - development.just
+        - fido.just
+        - gpg.just
