@@ -14,7 +14,7 @@ agate-gpg-reload ARG="":
 
     # handles help command
     if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
-        echo "usage: just agate-gpg-reload"
+        echo "usage: ujust agate-gpg-reload"
         echo "forces a restart of the gpg and smartcard stack to resolve detection issues."
         exit 0
     fi
@@ -41,7 +41,7 @@ agate-gpg-list ARG="":
 
     # handles help command
     if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
-        echo "usage: just agate-gpg-list"
+        echo "usage: ujust agate-gpg-list"
         echo "lists all public and secret keys currently stored in the local gpg keyring."
         exit 0
     fi
@@ -60,14 +60,14 @@ agate-gpg-import TARGET="" FLAG="":
 
     # handles help command
     if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ] || [ "{{FLAG}}" = "--help" ]; then
-        echo "usage: just agate-gpg-import [TARGET] [--list-all]"
+        echo "usage: ujust agate-gpg-import [TARGET] [--list-all]"
         echo ""
         echo "patterns:"
-        echo "  just agate-gpg-import                 (imports keys from clipboard)"
-        echo "  just agate-gpg-import ./keys.asc      (imports keys from physical file)"
-        echo "  just agate-gpg-import 79BE...         (fetches key from servers and imports)"
-        echo "  just agate-gpg-import user@email.com  (searches and imports via email)"
-        echo "  just agate-gpg-import 79BE... --list-all  (searches ALL servers without importing)"
+        echo "  ujust agate-gpg-import                 (imports keys from clipboard)"
+        echo "  ujust agate-gpg-import ./keys.asc      (imports keys from physical file)"
+        echo "  ujust agate-gpg-import 79BE...         (fetches key from servers and imports)"
+        echo "  ujust agate-gpg-import user@email.com  (searches and imports via email)"
+        echo "  ujust agate-gpg-import 79BE... --list-all  (searches ALL servers without importing)"
         exit 0
     fi
 
@@ -162,36 +162,6 @@ agate-gpg-import TARGET="" FLAG="":
         show_and_import "$INPUT_DATA"
     fi
 
-# scans the keyring and generates a list of 'just' commands to revoke non-essential keys
-[group("development")]
-agate-gpg-cleanup-list:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    echo "=== keystore scan: identifying keys for revocation ===" >&2
-    echo "# copy and paste the commands below to revoke and publish:"
-    echo ""
-
-    # parses gpg secret keys in colon format:
-    # field 1: type (sec = secret key)
-    # field 2: validity (r = revoked)
-    # field 5: key id
-    # we filter out the main key (D334181D1ABE834D) and keys already marked as revoked
-    mapfile -t KEYS_TO_REVOKE < <(gpg --list-secret-keys --with-colons 2>/dev/null | \
-        awk -F: '$1 == "sec" && $2 != "r" && $5 != "{{DEFAULT_GPG_KEY}}" {print $5}')
-
-    if [ ${#KEYS_TO_REVOKE[@]} -eq 0 ]; then
-        echo "# no keys found for revocation (excluding {{DEFAULT_GPG_KEY}})."
-        exit 0
-    fi
-
-    for KEY_ID in "${KEYS_TO_REVOKE[@]}"; do
-        KEY_INFO=$(gpg --list-secret-keys --with-colons "$KEY_ID" 2>/dev/null | grep '^uid' | cut -d: -f10 | head -n 1)
-        echo "# key: $KEY_ID ($KEY_INFO)"
-        echo "just agate-gpg-revoke $KEY_ID && just agate-gpg-publish $KEY_ID"
-        echo ""
-    done
-
 # interactively deletes a gpg key from the local keyring
 [group("development")]
 agate-gpg-delete ARG="":
@@ -200,7 +170,7 @@ agate-gpg-delete ARG="":
 
     # handles help command
     if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
-        echo "usage: just agate-gpg-delete"
+        echo "usage: ujust agate-gpg-delete"
         echo "launches an interactive menu to safely delete public and secret keys."
         exit 0
     fi
@@ -260,7 +230,7 @@ agate-gpg-edit ARG="":
 
     # handles help command
     if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
-        echo "usage: just agate-gpg-edit"
+        echo "usage: ujust agate-gpg-edit"
         echo "launches an interactive menu to edit key properties using the native gpg prompt."
         exit 0
     fi
@@ -311,11 +281,11 @@ agate-gpg-export-pub TARGET_KEY=DEFAULT_GPG_KEY:
 
     # handles help command
     if [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
-        echo "usage: just agate-gpg-export-pub [TARGET_KEY]"
+        echo "usage: ujust agate-gpg-export-pub [TARGET_KEY]"
         echo ""
         echo "patterns:"
-        echo "  just agate-gpg-export-pub         (exports default key to clipboard)"
-        echo "  just agate-gpg-export-pub select  (prompts for key selection, exports to clipboard)"
+        echo "  ujust agate-gpg-export-pub         (exports default key to clipboard)"
+        echo "  ujust agate-gpg-export-pub select  (prompts for key selection, exports to clipboard)"
         exit 0
     fi
 
@@ -377,12 +347,12 @@ agate-gpg-publish TARGET_KEY=DEFAULT_GPG_KEY:
 
     # handles help command
     if [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
-        echo "usage: just agate-gpg-publish [TARGET_KEY]"
+        echo "usage: ujust agate-gpg-publish [TARGET_KEY]"
         echo ""
         echo "patterns:"
-        echo "  just agate-gpg-publish                 (publishes the default key)"
-        echo "  just agate-gpg-publish select          (prompts for key selection to publish)"
-        echo "  just agate-gpg-publish 79BE...         (publishes a specific key id)"
+        echo "  ujust agate-gpg-publish                 (publishes the default key)"
+        echo "  ujust agate-gpg-publish select          (prompts for key selection to publish)"
+        echo "  ujust agate-gpg-publish 79BE...         (publishes a specific key id)"
         exit 0
     fi
 
@@ -432,7 +402,7 @@ agate-gpg-publish TARGET_KEY=DEFAULT_GPG_KEY:
     echo "publish operations completed." >&2
     echo "note: keys.openpgp.org requires email verification before the user id becomes publicly searchable." >&2
 
-# generates a revocation certificate and optionally applies it locally
+# generates a revocation certificate in the current folder and optionally applies it locally
 [group("development")]
 agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
     #!/usr/bin/env bash
@@ -440,12 +410,12 @@ agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
 
     # handles help command
     if [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
-        echo "usage: just agate-gpg-revoke [TARGET_KEY]"
+        echo "usage: ujust agate-gpg-revoke [TARGET_KEY]"
         echo ""
         echo "patterns:"
-        echo "  just agate-gpg-revoke                 (revokes the default key)"
-        echo "  just agate-gpg-revoke select          (prompts for secret key selection to revoke)"
-        echo "  just agate-gpg-revoke 79BE...         (revokes a specific key id)"
+        echo "  ujust agate-gpg-revoke                 (revokes the default key)"
+        echo "  ujust agate-gpg-revoke select          (prompts for secret key selection to revoke)"
+        echo "  ujust agate-gpg-revoke 79BE...         (revokes a specific key id)"
         exit 0
     fi
 
@@ -502,7 +472,7 @@ agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
     if [ "$CONFIRM" = "yes" ]; then
         gpg --import "$REV_FILE"
         echo "success: key $ACTIVE_KEY has been revoked locally." >&2
-        echo "use 'just agate-gpg-publish $ACTIVE_KEY' to broadcast the revocation to keyservers." >&2
+        echo "use 'ujust agate-gpg-publish $ACTIVE_KEY' to broadcast the revocation to keyservers." >&2
     else
         echo "local keyring left unchanged." >&2
     fi
@@ -515,14 +485,14 @@ agate-encrypt TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
 
     # handles help command
     if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ] || [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
-        echo "usage: just agate-encrypt [TARGET] [TARGET_KEY]"
+        echo "usage: ujust agate-encrypt [TARGET] [TARGET_KEY]"
         echo ""
         echo "patterns:"
-        echo "  just agate-encrypt                    (encrypts clipboard using default key)"
-        echo "  just agate-encrypt select             (encrypts clipboard, prompts for key)"
-        echo "  just agate-encrypt ./file.txt         (encrypts file using default key, outputs file.txt.asc)"
-        echo "  just agate-encrypt ./file.txt select  (encrypts file, prompts for key)"
-        echo "  echo 'data' | just agate-encrypt      (encrypts stdin stream using default key)"
+        echo "  ujust agate-encrypt                    (encrypts clipboard using default key)"
+        echo "  ujust agate-encrypt select             (encrypts clipboard, prompts for key)"
+        echo "  ujust agate-encrypt ./file.txt         (encrypts file using default key, outputs file.txt.asc)"
+        echo "  ujust agate-encrypt ./file.txt select  (encrypts file, prompts for key)"
+        echo "  echo 'data' | ujust agate-encrypt      (encrypts stdin stream using default key)"
         exit 0
     fi
 
@@ -613,14 +583,14 @@ agate-sign TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
 
     # handles help command
     if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ] || [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
-        echo "usage: just agate-sign [TARGET] [TARGET_KEY]"
+        echo "usage: ujust agate-sign [TARGET] [TARGET_KEY]"
         echo ""
         echo "patterns:"
-        echo "  just agate-sign                    (signs clipboard using default key)"
-        echo "  just agate-sign select             (signs clipboard, prompts for key)"
-        echo "  just agate-sign ./file.txt         (signs file using default key, outputs file.txt.asc)"
-        echo "  just agate-sign ./file.txt select  (signs file, prompts for key)"
-        echo "  echo 'data' | just agate-sign      (signs stdin stream using default key)"
+        echo "  ujust agate-sign                    (signs clipboard using default key)"
+        echo "  ujust agate-sign select             (signs clipboard, prompts for key)"
+        echo "  ujust agate-sign ./file.txt         (signs file using default key, outputs file.txt.asc)"
+        echo "  ujust agate-sign ./file.txt select  (signs file, prompts for key)"
+        echo "  echo 'data' | ujust agate-sign      (signs stdin stream using default key)"
         exit 0
     fi
 
@@ -706,12 +676,12 @@ agate-decrypt TARGET="":
 
     # handles help command
     if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ]; then
-        echo "usage: just agate-decrypt [TARGET]"
+        echo "usage: ujust agate-decrypt [TARGET]"
         echo ""
         echo "patterns:"
-        echo "  just agate-decrypt                 (decrypts clipboard to terminal/stdout)"
-        echo "  just agate-decrypt ./file.txt.asc  (decrypts file to terminal/stdout)"
-        echo "  cat data.asc | just agate-decrypt  (decrypts stdin stream to terminal/stdout)"
+        echo "  ujust agate-decrypt                 (decrypts clipboard to terminal/stdout)"
+        echo "  ujust agate-decrypt ./file.txt.asc  (decrypts file to terminal/stdout)"
+        echo "  cat data.asc | ujust agate-decrypt  (decrypts stdin stream to terminal/stdout)"
         exit 0
     fi
 
@@ -756,10 +726,10 @@ agate-git-sign ARG="":
 
     # handles help command
     if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
-        echo "usage: just agate-git-sign"
+        echo "usage: ujust agate-git-sign"
         echo ""
         echo "patterns:"
-        echo "  just agate-git-sign                (launches interactive menu to select signing key)"
+        echo "  ujust agate-git-sign                (launches interactive menu to select signing key)"
         exit 0
     fi
 
