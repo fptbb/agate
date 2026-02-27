@@ -46,4 +46,4 @@ modules:
   - type: justfiles
     validate: true
     include:
-        - entertainment.just
+      - entertainment.just

@@ -7,7 +7,7 @@ modules:
       - nix.sh
   - type: justfiles
     validate: true
-    include:
-        - development.just
-        - fido.just
-        - gpg.just
+    include: # use just --fmt --check --unstable --justfile to validate justfiles
+      - development.just
+      - fido.just
+      - gpg.just

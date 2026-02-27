@@ -1,505 +1,504 @@
 workflow:
-  rules:
-    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
-      when: never
-    - if: "$CI_COMMIT_TAG"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: "$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS"
-      when: never
-    - if: "$CI_COMMIT_BRANCH"
-    # Daily Builds
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    rules:
+        - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+          when: never
+        - if: "$CI_COMMIT_TAG"
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: "$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS"
+          when: never
+        - if: "$CI_COMMIT_BRANCH"
+        # Daily Builds
+        - if: $CI_PIPELINE_SOURCE == "schedule"
 
 variables:
-  IMAGE_NAME: "agate"
-  UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
-  UPSTREAM_REGISTRY: "ghcr.io"
+    IMAGE_NAME: "agate"
+    UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
+    UPSTREAM_REGISTRY: "ghcr.io"
 
 .anchors:
-  skip-unforced: &skip-unforced
-    if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
-    when: never
+    skip-unforced: &skip-unforced
+        if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
+        when: never
 
 .python-job:
-  image: python:3-alpine
-  before_script:
-    - pip install requests
+    image: python:3-alpine
+    before_script:
+        - pip install requests
 
 stages:
-  - check
-  - build
-  - publish
-  - deploy
-  - cleanup
+    - check
+    - build
+    - publish
+    - deploy
+    - cleanup
 
 check-update:
-  extends: .python-job
-  stage: check
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-  artifacts:
-    reports:
-      dotenv: build.env
-  script:
-    - |
-      python3 -c '
-      import os, sys, requests, datetime, json, logging, smtplib, ssl
-      from email.message import EmailMessage
-      from datetime import datetime, timezone
-      from requests.auth import HTTPBasicAuth
+    extends: .python-job
+    stage: check
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+    artifacts:
+        reports:
+            dotenv: build.env
+    script:
+        - |
+            python3 -c '
+            import os, sys, requests, datetime, json, logging, smtplib, ssl
+            from email.message import EmailMessage
+            from datetime import datetime, timezone
+            from requests.auth import HTTPBasicAuth
 
-      logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-      logger = logging.getLogger(__name__)
+            logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+            logger = logging.getLogger(__name__)
 
-      def send_notification(upstream_date, local_date):
-          host = os.environ.get("EMAIL_HOST")
-          port = os.environ.get("EMAIL_PORT")
-          user = os.environ.get("EMAIL_USER")
-          password = os.environ.get("EMAIL_PASSWORD")
-          recipient = os.environ.get("EMAIL_TO")
+            def send_notification(upstream_date, local_date):
+                host = os.environ.get("EMAIL_HOST")
+                port = os.environ.get("EMAIL_PORT")
+                user = os.environ.get("EMAIL_USER")
+                password = os.environ.get("EMAIL_PASSWORD")
+                recipient = os.environ.get("EMAIL_TO")
 
-          if not all([host, port, user, password, recipient]):
-              logger.warning("Email configuration missing. Skipping notification.")
-              return
+                if not all([host, port, user, password, recipient]):
+                    logger.warning("Email configuration missing. Skipping notification.")
+                    return
 
-          msg = EmailMessage()
-          msg.set_content(f"Update Detected!\n\nUpstream Date: {upstream_date}\nLocal Date: {local_date}\n\nTriggering build...")
-          msg["Subject"] = "Agate: Bazzite Update Detected"
-          msg["From"] = user
-          msg["To"] = recipient
+                msg = EmailMessage()
+                msg.set_content(f"Update Detected!\n\nUpstream Date: {upstream_date}\nLocal Date: {local_date}\n\nTriggering build...")
+                msg["Subject"] = "Agate: Bazzite Update Detected"
+                msg["From"] = user
+                msg["To"] = recipient
 
-          try:
-              context = ssl.create_default_context()
-              with smtplib.SMTP(host, int(port)) as server:
-                  server.starttls(context=context)
-                  server.login(user, password)
-                  server.send_message(msg)
-              logger.info(f"Notification sent to {recipient}")
-          except Exception as e:
-              logger.error(f"Failed to send email: {e}")
+                try:
+                    context = ssl.create_default_context()
+                    with smtplib.SMTP(host, int(port)) as server:
+                        server.starttls(context=context)
+                        server.login(user, password)
+                        server.send_message(msg)
+                    logger.info(f"Notification sent to {recipient}")
+                except Exception as e:
+                    logger.error(f"Failed to send email: {e}")
 
-      class ImageCheck:
-          def __init__(self, registry, repo, username=None, password=None, is_ghcr=False):
-              self.registry = registry
-              self.repo = repo
-              self.username = username
-              self.password = password
-              self.is_ghcr = is_ghcr
-              self.session = requests.Session()
-              self.base_url = f"https://{self.registry}/v2"
-              
-              # Auth setup
-              if self.is_ghcr:
-                  self.token = self.get_ghcr_token()
-              elif self.username and self.password:
-                  self.token = self.get_auth_token()
-              else:
-                  self.token = None # Fallback or public
+            class ImageCheck:
+                def __init__(self, registry, repo, username=None, password=None, is_ghcr=False):
+                    self.registry = registry
+                    self.repo = repo
+                    self.username = username
+                    self.password = password
+                    self.is_ghcr = is_ghcr
+                    self.session = requests.Session()
+                    self.base_url = f"https://{self.registry}/v2"
+                    
+                    # Auth setup
+                    if self.is_ghcr:
+                        self.token = self.get_ghcr_token()
+                    elif self.username and self.password:
+                        self.token = self.get_auth_token()
+                    else:
+                        self.token = None # Fallback or public
 
-              if self.token:
-                  self.session.headers.update({"Authorization": f"Bearer {self.token}"})
-              
-              self.session.headers.update({
-                  "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
-              })
+                    if self.token:
+                        self.session.headers.update({"Authorization": f"Bearer {self.token}"})
+                    
+                    self.session.headers.update({
+                        "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
+                    })
 
-          def get_ghcr_token(self):
-              try:
-                  url = f"https://ghcr.io/token?scope=repository:{self.repo}:pull"
-                  return requests.get(url).json()["token"]
-              except Exception as e:
-                  logger.warning(f"Failed GHCR fetch token: {e}")
-                  return None
+                def get_ghcr_token(self):
+                    try:
+                        url = f"https://ghcr.io/token?scope=repository:{self.repo}:pull"
+                        return requests.get(url).json()["token"]
+                    except Exception as e:
+                        logger.warning(f"Failed GHCR fetch token: {e}")
+                        return None
 
-          def get_auth_token(self):
-              scope = f"repository:{self.repo}:pull"
-              service = self.registry
-              auth_url = f"https://{self.registry}/v2/auth?service={service}&scope={scope}"
-              try:
-                  # Basic Auth to get Token
-                  resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
-                  if resp.status_code != 200:
-                      logger.error(f"Auth failed {self.registry}: {resp.status_code} {resp.text}")
-                      return None
-                  return resp.json().get("token")
-              except Exception as e:
-                  logger.error(f"Auth error {self.registry}: {e}")
-                  return None
+                def get_auth_token(self):
+                    scope = f"repository:{self.repo}:pull"
+                    service = self.registry
+                    auth_url = f"https://{self.registry}/v2/auth?service={service}&scope={scope}"
+                    try:
+                        # Basic Auth to get Token
+                        resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
+                        if resp.status_code != 200:
+                            logger.error(f"Auth failed {self.registry}: {resp.status_code} {resp.text}")
+                            return None
+                        return resp.json().get("token")
+                    except Exception as e:
+                        logger.error(f"Auth error {self.registry}: {e}")
+                        return None
 
-          def parse_date(self, date_str):
-              try:
-                  date_str = date_str.replace("Z", "+00:00")
-                  if "." in date_str and "+" in date_str:
-                      main, tz = date_str.split("+")
-                      date_str = f"{main[:26]}+{tz}"
-                  return datetime.fromisoformat(date_str)
-              except: return None
+                def parse_date(self, date_str):
+                    try:
+                        date_str = date_str.replace("Z", "+00:00")
+                        if "." in date_str and "+" in date_str:
+                            main, tz = date_str.split("+")
+                            date_str = f"{main[:26]}+{tz}"
+                        return datetime.fromisoformat(date_str)
+                    except: return None
 
-          def get_created_date(self, tag):
-              url = f"{self.base_url}/{self.repo}/manifests/{tag}"
-              try:
-                  resp = self.session.get(url)
-                  if resp.status_code != 200:
-                      logger.error(f"Manifest fetch failed {self.registry}/{self.repo}:{tag} - {resp.status_code}")
-                      return None
-                  
-                  manifest = resp.json()
-                  dt = None
+                def get_created_date(self, tag):
+                    url = f"{self.base_url}/{self.repo}/manifests/{tag}"
+                    try:
+                        resp = self.session.get(url)
+                        if resp.status_code != 200:
+                            logger.error(f"Manifest fetch failed {self.registry}/{self.repo}:{tag} - {resp.status_code}")
+                            return None
+                        
+                        manifest = resp.json()
+                        dt = None
 
-                  # Recursive for lists
-                  if "manifests" in manifest:
-                      sub_digest = manifest["manifests"][0]["digest"]
-                      # Fetch sub-manifest
-                      resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{sub_digest}")
-                      if resp.status_code == 200:
-                          manifest = resp.json()
+                        # Recursive for lists
+                        if "manifests" in manifest:
+                            sub_digest = manifest["manifests"][0]["digest"]
+                            # Fetch sub-manifest
+                            resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{sub_digest}")
+                            if resp.status_code == 200:
+                                manifest = resp.json()
 
-                  # Try config blob
-                  if "config" in manifest:
-                      cfg_digest = manifest["config"].get("digest")
-                      if cfg_digest:
-                          resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}")
-                          if resp.status_code == 200:
-                              dt = self.parse_date(resp.json().get("created"))
-                  
-                  # Try history
-                  if not dt and "history" in manifest:
-                      v1 = json.loads(manifest["history"][0]["v1Compatibility"])
-                      dt = self.parse_date(v1.get("created"))
-                      
-                  return dt
-              except Exception as e:
-                  logger.error(f"Error fetching date {self.registry}: {e}")
-                  return None
+                        # Try config blob
+                        if "config" in manifest:
+                            cfg_digest = manifest["config"].get("digest")
+                            if cfg_digest:
+                                resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}")
+                                if resp.status_code == 200:
+                                    dt = self.parse_date(resp.json().get("created"))
+                        
+                        # Try history
+                        if not dt and "history" in manifest:
+                            v1 = json.loads(manifest["history"][0]["v1Compatibility"])
+                            dt = self.parse_date(v1.get("created"))
+                            
+                        return dt
+                    except Exception as e:
+                        logger.error(f"Error fetching date {self.registry}: {e}")
+                        return None
 
-      # Config
-      upstream_image = os.environ.get("UPSTREAM_IMAGE", "ublue-os/bazzite-dx-nvidia")
-      upstream_registry = os.environ.get("UPSTREAM_REGISTRY", "ghcr.io")
-      namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
-      image_name = os.environ.get("IMAGE_NAME", "agate")
-      local_image = f"{namespace}/{image_name}"
-      registry = os.environ.get("BB_REGISTRY", "quay.io")
-      user = os.environ.get("BB_USERNAME")
-      pwd = os.environ.get("BB_PASSWORD")
+            # Config
+            upstream_image = os.environ.get("UPSTREAM_IMAGE", "ublue-os/bazzite-dx-nvidia")
+            upstream_registry = os.environ.get("UPSTREAM_REGISTRY", "ghcr.io")
+            namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
+            image_name = os.environ.get("IMAGE_NAME", "agate")
+            local_image = f"{namespace}/{image_name}"
+            registry = os.environ.get("BB_REGISTRY", "quay.io")
+            user = os.environ.get("BB_USERNAME")
+            pwd = os.environ.get("BB_PASSWORD")
 
-      logger.info(f"Checking Upstream: {upstream_registry}/{upstream_image}")
-      upstream_client = ImageCheck(upstream_registry, upstream_image, is_ghcr=("ghcr.io" in upstream_registry.lower()))
-      ud = upstream_client.get_created_date("latest")
+            logger.info(f"Checking Upstream: {upstream_registry}/{upstream_image}")
+            upstream_client = ImageCheck(upstream_registry, upstream_image, is_ghcr=("ghcr.io" in upstream_registry.lower()))
+            ud = upstream_client.get_created_date("latest")
 
-      logger.info(f"Checking Local: {registry}/{local_image}")
-      local_client = ImageCheck(registry, local_image, username=user, password=pwd)
-      ld = local_client.get_created_date("latest")
+            logger.info(f"Checking Local: {registry}/{local_image}")
+            local_client = ImageCheck(registry, local_image, username=user, password=pwd)
+            ld = local_client.get_created_date("latest")
 
-      if not ud:
-          logger.error("Could not fetch upstream date.")
-          # Fail safe -> Build
-          with open("build.env", "w") as f:
-              f.write("FORCE_BUILD=true")
-          sys.exit(0)
-      
-      if not ld:
-          logger.warning("Could not fetch local date. Assuming first build.")
-          # Fail safe -> Build
-          with open("build.env", "w") as f:
-              f.write("FORCE_BUILD=true")
-          sys.exit(0)
+            if not ud:
+                logger.error("Could not fetch upstream date.")
+                # Fail safe -> Build
+                with open("build.env", "w") as f:
+                    f.write("FORCE_BUILD=true")
+                sys.exit(0)
 
-      logger.info(f"Upstream Date: {ud}")
-      logger.info(f"Local Date:    {ld}")
+            if not ld:
+                logger.warning("Could not fetch local date. Assuming first build.")
+                # Fail safe -> Build
+                with open("build.env", "w") as f:
+                    f.write("FORCE_BUILD=true")
+                sys.exit(0)
 
-      if ud > ld:
-          logger.info("Update Available. Proceeding to build.")
-          send_notification(ud, ld)
-          with open("build.env", "w") as f:
-              f.write("FORCE_BUILD=true")
-          sys.exit(0)
-      else:
-          logger.info("System is up to date. Stopping pipeline.")
-          with open("build.env", "w") as f:
-              f.write("FORCE_BUILD=false")
-          sys.exit(0)
-      '
+            logger.info(f"Upstream Date: {ud}")
+            logger.info(f"Local Date:    {ld}")
 
+            if ud > ld:
+                logger.info("Update Available. Proceeding to build.")
+                send_notification(ud, ld)
+                with open("build.env", "w") as f:
+                    f.write("FORCE_BUILD=true")
+                sys.exit(0)
+            else:
+                logger.info("System is up to date. Stopping pipeline.")
+                with open("build.env", "w") as f:
+                    f.write("FORCE_BUILD=false")
+                sys.exit(0)
+            '
 
 build-image:
-  stage: build
-  rules:
-    - *skip-unforced
-    - when: on_success
-  tags:
-    - saas-linux-2xlarge-amd64
-  image:
-    name: ghcr.io/blue-build/cli
-    entrypoint: [""]
-  services:
-    - docker:dind
-  parallel:
-    matrix:
-      - RECIPE:
-          - recipe.yml
-  variables:
-    # Setup a secure connection with docker-in-docker service
-    # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html
-    DOCKER_HOST: tcp://docker:2376
-    DOCKER_TLS_CERTDIR: /certs
-    DOCKER_TLS_VERIFY: 1
-    DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
-  before_script:
-    # Pulls secure files into the build
-    - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
-    - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
-    - docker login $BB_REGISTRY -u $BB_USERNAME -p $BB_PASSWORD
-  script:
-    - sleep 5 # Wait a bit for the docker-in-docker service to start
-    - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
-    - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
+    stage: build
+    rules:
+        - *skip-unforced
+        - when: on_success
+    tags:
+        - saas-linux-2xlarge-amd64
+    image:
+        name: ghcr.io/blue-build/cli
+        entrypoint: [""]
+    services:
+        - docker:dind
+    parallel:
+        matrix:
+            - RECIPE:
+                  - recipe.yml
+    variables:
+        # Setup a secure connection with docker-in-docker service
+        # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html
+        DOCKER_HOST: tcp://docker:2376
+        DOCKER_TLS_CERTDIR: /certs
+        DOCKER_TLS_VERIFY: 1
+        DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
+    before_script:
+        # Pulls secure files into the build
+        - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
+        - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
+        - docker login $BB_REGISTRY -u $BB_USERNAME -p $BB_PASSWORD
+    script:
+        - sleep 5 # Wait a bit for the docker-in-docker service to start
+        - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
+        - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
 
 publish-metadata:
-  stage: publish
-  image: alpine:latest
-  variables:
-    REGCTL_VERSION: v0.5.0
-    DEST_REPO: "$BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME:artifacthub.io"
-  rules:
-    - *skip-unforced
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_COMMIT_TAG
-  before_script:
-    - apk add --no-cache curl
-    - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
-    - chmod +x /usr/local/bin/regctl
-    - echo "$BB_PASSWORD" | regctl registry login $BB_REGISTRY -u "$BB_USERNAME" --pass-stdin
-  script:
-    - |
-      if [ ! -f "artifacthub-repo.yml" ]; then
-        echo "Error: artifacthub-repo.yml not found in repository root."
-        exit 1
-      fi
-    - |
-      regctl artifact put \
-        --format '{{ .Manifest.GetDescriptor.Digest }}' \
-        --artifact-type application/vnd.cncf.artifacthub.config.v1+yaml \
-        -f artifacthub-repo.yml \
-        --file-media-type "application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml" \
-        $DEST_REPO
+    stage: publish
+    image: alpine:latest
+    variables:
+        REGCTL_VERSION: v0.5.0
+        DEST_REPO: "$BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME:artifacthub.io"
+    rules:
+        - *skip-unforced
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+        - if: $CI_COMMIT_TAG
+    before_script:
+        - apk add --no-cache curl
+        - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
+        - chmod +x /usr/local/bin/regctl
+        - echo "$BB_PASSWORD" | regctl registry login $BB_REGISTRY -u "$BB_USERNAME" --pass-stdin
+    script:
+        - |
+            if [ ! -f "artifacthub-repo.yml" ]; then
+              echo "Error: artifacthub-repo.yml not found in repository root."
+              exit 1
+            fi
+        - |
+            regctl artifact put \
+              --format '{{ .Manifest.GetDescriptor.Digest }}' \
+              --artifact-type application/vnd.cncf.artifacthub.config.v1+yaml \
+              -f artifacthub-repo.yml \
+              --file-media-type "application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml" \
+              $DEST_REPO
 
 cleanup-old-tags:
-  extends: .python-job
-  stage: cleanup
-  rules:
-    - *skip-unforced
-    - when: on_success
-  variables:
-    MAX_AGE_DAYS: "7"
-    MAX_KEEP: "5"
-    DRY_RUN: "false"
-  script:
-    - |
-      python3 -c '
-      import os
-      import sys
-      import json
-      import logging
-      import requests
-      from datetime import datetime, timezone
-      from requests.auth import HTTPBasicAuth
+    extends: .python-job
+    stage: cleanup
+    rules:
+        - *skip-unforced
+        - when: on_success
+    variables:
+        MAX_AGE_DAYS: "7"
+        MAX_KEEP: "5"
+        DRY_RUN: "false"
+    script:
+        - |
+            python3 -c '
+            import os
+            import sys
+            import json
+            import logging
+            import requests
+            from datetime import datetime, timezone
+            from requests.auth import HTTPBasicAuth
 
-      logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-      logger = logging.getLogger(__name__)
+            logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+            logger = logging.getLogger(__name__)
 
-      class DockerV2Cleaner:
-          def __init__(self):
-              self.registry = os.environ.get("BB_REGISTRY", "quay.io")
-              namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
-              image = os.environ.get("IMAGE_NAME", "agate")
-              self.repo = f"{namespace}/{image}"
-              self.username = os.environ.get("BB_USERNAME")
-              self.password = os.environ.get("BB_PASSWORD")
-              self.dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
-              
-              if not all([namespace, image, self.username, self.password]):
-                  logger.error("Missing variables.")
-                  sys.exit(1)
+            class DockerV2Cleaner:
+                def __init__(self):
+                    self.registry = os.environ.get("BB_REGISTRY", "quay.io")
+                    namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
+                    image = os.environ.get("IMAGE_NAME", "agate")
+                    self.repo = f"{namespace}/{image}"
+                    self.username = os.environ.get("BB_USERNAME")
+                    self.password = os.environ.get("BB_PASSWORD")
+                    self.dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
+                    
+                    if not all([namespace, image, self.username, self.password]):
+                        logger.error("Missing variables.")
+                        sys.exit(1)
 
-              self.session = requests.Session()
-              self.base_url = f"https://{self.registry}/v2"
-              self.token = self.get_auth_token()
-              self.session.headers.update({
-                  "Authorization": f"Bearer {self.token}",
-                  "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
-              })
+                    self.session = requests.Session()
+                    self.base_url = f"https://{self.registry}/v2"
+                    self.token = self.get_auth_token()
+                    self.session.headers.update({
+                        "Authorization": f"Bearer {self.token}",
+                        "Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
+                    })
 
-          def get_auth_token(self):
-              scope = f"repository:{self.repo}:pull,push"
-              auth_url = f"https://{self.registry}/v2/auth?service={self.registry}&scope={scope}"
-              try:
-                  resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
-                  if resp.status_code != 200: sys.exit(1)
-                  return resp.json().get("token")
-              except: sys.exit(1)
+                def get_auth_token(self):
+                    scope = f"repository:{self.repo}:pull,push"
+                    auth_url = f"https://{self.registry}/v2/auth?service={self.registry}&scope={scope}"
+                    try:
+                        resp = requests.get(auth_url, auth=HTTPBasicAuth(self.username, self.password))
+                        if resp.status_code != 200: sys.exit(1)
+                        return resp.json().get("token")
+                    except: sys.exit(1)
 
-          def get_all_tags(self):
-              url = f"{self.base_url}/{self.repo}/tags/list"
-              all_tags = []
-              while url:
-                  try:
-                      resp = self.session.get(url)
-                      if resp.status_code != 200: break
-                      data = resp.json()
-                      all_tags.extend(data.get("tags", []))
-                      link = resp.headers.get("Link")
-                      url = None
-                      if link and "rel=\"next\"" in link:
-                          url = link.split(";")[0].strip("<>")
-                          if not url.startswith("http"): url = f"https://{self.registry}{url}"
-                  except: break
-              return all_tags
+                def get_all_tags(self):
+                    url = f"{self.base_url}/{self.repo}/tags/list"
+                    all_tags = []
+                    while url:
+                        try:
+                            resp = self.session.get(url)
+                            if resp.status_code != 200: break
+                            data = resp.json()
+                            all_tags.extend(data.get("tags", []))
+                            link = resp.headers.get("Link")
+                            url = None
+                            if link and "rel=\"next\"" in link:
+                                url = link.split(";")[0].strip("<>")
+                                if not url.startswith("http"): url = f"https://{self.registry}{url}"
+                        except: break
+                    return all_tags
 
-          def parse_date(self, date_str):
-              try:
-                  date_str = date_str.replace("Z", "+00:00")
-                  if "." in date_str and "+" in date_str:
-                      main, tz = date_str.split("+")
-                      date_str = f"{main[:26]}+{tz}"
-                  return datetime.fromisoformat(date_str)
-              except: return None
+                def parse_date(self, date_str):
+                    try:
+                        date_str = date_str.replace("Z", "+00:00")
+                        if "." in date_str and "+" in date_str:
+                            main, tz = date_str.split("+")
+                            date_str = f"{main[:26]}+{tz}"
+                        return datetime.fromisoformat(date_str)
+                    except: return None
 
-          def fetch_manifest(self, digest_or_tag):
-              try:
-                  resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{digest_or_tag}")
-                  if resp.status_code != 200: return None, None
-                  return resp.json(), resp.headers.get("Docker-Content-Digest")
-              except: return None, None
+                def fetch_manifest(self, digest_or_tag):
+                    try:
+                        resp = self.session.get(f"{self.base_url}/{self.repo}/manifests/{digest_or_tag}")
+                        if resp.status_code != 200: return None, None
+                        return resp.json(), resp.headers.get("Docker-Content-Digest")
+                    except: return None, None
 
-          def get_date_from_single_manifest(self, manifest):
-              if "annotations" in manifest:
-                  created = manifest["annotations"].get("org.opencontainers.image.created")
-                  if created: return self.parse_date(created)
-              if "config" in manifest:
-                  cfg_digest = manifest["config"].get("digest")
-                  if cfg_digest:
-                      resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}")
-                      if resp.status_code == 200:
-                          return self.parse_date(resp.json().get("created"))
-              if "history" in manifest and len(manifest["history"]) > 0:
-                  try:
-                      v1 = json.loads(manifest["history"][0]["v1Compatibility"])
-                      return self.parse_date(v1.get("created"))
-                  except: pass
-              return None
+                def get_date_from_single_manifest(self, manifest):
+                    if "annotations" in manifest:
+                        created = manifest["annotations"].get("org.opencontainers.image.created")
+                        if created: return self.parse_date(created)
+                    if "config" in manifest:
+                        cfg_digest = manifest["config"].get("digest")
+                        if cfg_digest:
+                            resp = self.session.get(f"{self.base_url}/{self.repo}/blobs/{cfg_digest}")
+                            if resp.status_code == 200:
+                                return self.parse_date(resp.json().get("created"))
+                    if "history" in manifest and len(manifest["history"]) > 0:
+                        try:
+                            v1 = json.loads(manifest["history"][0]["v1Compatibility"])
+                            return self.parse_date(v1.get("created"))
+                        except: pass
+                    return None
 
-          def get_tag_metadata(self, tag):
-              root_manifest, root_digest = self.fetch_manifest(tag)
-              if not root_manifest: return None
-              dt = None
-              
-              # Multi-Arch List
-              if "manifests" in root_manifest:
-                  sub_digest = root_manifest["manifests"][0]["digest"]
-                  sub_manifest, _ = self.fetch_manifest(sub_digest)
-                  if sub_manifest: dt = self.get_date_from_single_manifest(sub_manifest)
-              # Standard Image
-              else:
-                  dt = self.get_date_from_single_manifest(root_manifest)
+                def get_tag_metadata(self, tag):
+                    root_manifest, root_digest = self.fetch_manifest(tag)
+                    if not root_manifest: return None
+                    dt = None
+                    
+                    # Multi-Arch List
+                    if "manifests" in root_manifest:
+                        sub_digest = root_manifest["manifests"][0]["digest"]
+                        sub_manifest, _ = self.fetch_manifest(sub_digest)
+                        if sub_manifest: dt = self.get_date_from_single_manifest(sub_manifest)
+                    # Standard Image
+                    else:
+                        dt = self.get_date_from_single_manifest(root_manifest)
 
-              if dt:
-                  if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
-                  return {"name": tag, "date": dt, "digest": root_digest}
-              return None
+                    if dt:
+                        if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+                        return {"name": tag, "date": dt, "digest": root_digest}
+                    return None
 
-          def delete_tag(self, tag, digest):
-              if self.dry_run:
-                  logger.info(f"[DRY RUN] Delete {tag}")
-                  return True
-              resp = self.session.delete(f"{self.base_url}/{self.repo}/manifests/{digest}")
-              if resp.status_code in [200, 202, 204]:
-                  logger.info(f"Deleted {tag}")
-                  return True
-              logger.error(f"Failed delete {tag}: {resp.status_code}")
-              return False
+                def delete_tag(self, tag, digest):
+                    if self.dry_run:
+                        logger.info(f"[DRY RUN] Delete {tag}")
+                        return True
+                    resp = self.session.delete(f"{self.base_url}/{self.repo}/manifests/{digest}")
+                    if resp.status_code in [200, 202, 204]:
+                        logger.info(f"Deleted {tag}")
+                        return True
+                    logger.error(f"Failed delete {tag}: {resp.status_code}")
+                    return False
 
-          def get_cosign_sig_name(self, image_digest):
-              clean_digest = image_digest.replace(":", "-")
-              return f"{clean_digest}.sig"
+                def get_cosign_sig_name(self, image_digest):
+                    clean_digest = image_digest.replace(":", "-")
+                    return f"{clean_digest}.sig"
 
-          def run(self):
-              max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
-              max_keep = int(os.environ.get("MAX_KEEP", 5))
-              protected_tags = ["latest", "latest-cache"]
+                def run(self):
+                    max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
+                    max_keep = int(os.environ.get("MAX_KEEP", 5))
+                    protected_tags = ["latest", "latest-cache"]
 
-              logger.info(f"Scanning {self.repo}...")
-              tags = self.get_all_tags()
-              logger.info(f"Found {len(tags)} tags. Parsing metadata...")
+                    logger.info(f"Scanning {self.repo}...")
+                    tags = self.get_all_tags()
+                    logger.info(f"Found {len(tags)} tags. Parsing metadata...")
 
-              tag_data = []
-              for tag in tags:
-                  meta = self.get_tag_metadata(tag)
-                  if meta: tag_data.append(meta)
+                    tag_data = []
+                    for tag in tags:
+                        meta = self.get_tag_metadata(tag)
+                        if meta: tag_data.append(meta)
 
-              # Sort: Newest First
-              tag_data.sort(key=lambda x: x["date"], reverse=True)
+                    # Sort: Newest First
+                    tag_data.sort(key=lambda x: x["date"], reverse=True)
 
-              # === PASS 1: Identify ACTIVE images ===
-              # We determine which images are "Kept". 
-              # If an image is kept, we Whitelist its Digest AND its Signature.
-              
-              active_digests = set()
-              active_signatures = set()
-              image_count = 0
-              
-              for item in tag_data:
-                  name = item["name"]
-                  digest = item["digest"]
-                  
-                  # Skip signature files during decision making
-                  if name.endswith(".sig"): continue
+                    # === PASS 1: Identify ACTIVE images ===
+                    # We determine which images are "Kept". 
+                    # If an image is kept, we Whitelist its Digest AND its Signature.
+                    
+                    active_digests = set()
+                    active_signatures = set()
+                    image_count = 0
+                    
+                    for item in tag_data:
+                        name = item["name"]
+                        digest = item["digest"]
+                        
+                        # Skip signature files during decision making
+                        if name.endswith(".sig"): continue
 
-                  age_days = (datetime.now(timezone.utc) - item["date"]).days
-                  should_keep = False
+                        age_days = (datetime.now(timezone.utc) - item["date"]).days
+                        should_keep = False
 
-                  # Criterion A: Protected Name
-                  if name in protected_tags:
-                      should_keep = True
-                  
-                  # Criterion B: Within Max Keep Count
-                  elif image_count < max_keep:
-                      should_keep = True
-                      image_count += 1
-                  
-                  # Criterion C: Young Age
-                  elif age_days <= max_age_days:
-                      should_keep = True
+                        # Criterion A: Protected Name
+                        if name in protected_tags:
+                            should_keep = True
+                        
+                        # Criterion B: Within Max Keep Count
+                        elif image_count < max_keep:
+                            should_keep = True
+                            image_count += 1
+                        
+                        # Criterion C: Young Age
+                        elif age_days <= max_age_days:
+                            should_keep = True
 
-                  if should_keep:
-                      active_digests.add(digest)
-                      # CRITICAL: Calculate and whitelist the signature for this digest
-                      active_signatures.add(self.get_cosign_sig_name(digest))
+                        if should_keep:
+                            active_digests.add(digest)
+                            # CRITICAL: Calculate and whitelist the signature for this digest
+                            active_signatures.add(self.get_cosign_sig_name(digest))
 
-              logger.info(f"Analysis Complete. Protecting {len(active_digests)} images and their signatures.")
+                    logger.info(f"Analysis Complete. Protecting {len(active_digests)} images and their signatures.")
 
-              # === PASS 2: Perform Cleanup ===
-              for item in tag_data:
-                  name = item["name"]
-                  digest = item["digest"]
+                    # === PASS 2: Perform Cleanup ===
+                    for item in tag_data:
+                        name = item["name"]
+                        digest = item["digest"]
 
-                  # Case 1: It is a Signature
-                  if name.endswith(".sig"):
-                      if name in active_signatures:
-                          logger.info(f"Keeping {name} (Signature of Active Image)")
-                      else:
-                          # Delete orphaned signatures or signatures of expired images
-                          logger.info(f"Deleting {name} (Orphaned/Expired Signature)")
-                          self.delete_tag(name, digest)
-                      continue
+                        # Case 1: It is a Signature
+                        if name.endswith(".sig"):
+                            if name in active_signatures:
+                                logger.info(f"Keeping {name} (Signature of Active Image)")
+                            else:
+                                # Delete orphaned signatures or signatures of expired images
+                                logger.info(f"Deleting {name} (Orphaned/Expired Signature)")
+                                self.delete_tag(name, digest)
+                            continue
 
-                  # Case 2: It is an Image
-                  if digest in active_digests:
-                      logger.info(f"Keeping {name} (Active Image)")
-                  else:
-                      logger.info(f"Deleting {name} (Expired/Excess Image)")
-                      self.delete_tag(name, digest)
+                        # Case 2: It is an Image
+                        if digest in active_digests:
+                            logger.info(f"Keeping {name} (Active Image)")
+                        else:
+                            logger.info(f"Deleting {name} (Expired/Excess Image)")
+                            self.delete_tag(name, digest)
 
-      if __name__ == "__main__":
-          cleaner = DockerV2Cleaner()
-          cleaner.run()
-      '
+            if __name__ == "__main__":
+                cleaner = DockerV2Cleaner()
+                cleaner.run()
+            '

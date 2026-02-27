@@ -113,7 +113,7 @@ agate-luks-remove TARGET_DEV="": _agate-check-luks-deps
         exit 1
     fi
 
-    SELECTED_DEV="{{TARGET_DEV}}"
+    SELECTED_DEV="{{ TARGET_DEV }}"
 
     # handles interactive device selection
     if [ -z "$SELECTED_DEV" ]; then

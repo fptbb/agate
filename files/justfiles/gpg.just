@@ -1,9 +1,10 @@
 # Agate OS GPG and YubiKey Utilities
-
 # default key id for operations. override via cli if needed.
+
 DEFAULT_GPG_KEY := "D334181D1ABE834D"
 
 # global keyservers used for searching, importing, and publishing
+
 GPG_SERVERS := "hkps://keyserver.ubuntu.com hkps://keys.openpgp.org hkps://pgp.mit.edu hkps://keys.mailvelope.com"
 
 # forces a restart of the gpg and smartcard stack
@@ -13,7 +14,7 @@ agate-gpg-reload ARG="":
     set -euo pipefail
 
     # handles help command
-    if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
+    if [ "{{ ARG }}" = "--help" ] || [ "{{ ARG }}" = "-h" ]; then
         echo "usage: ujust agate-gpg-reload"
         echo "forces a restart of the gpg and smartcard stack to resolve detection issues."
         exit 0
@@ -30,7 +31,7 @@ agate-gpg-reload ARG="":
 
     echo "ssh keys currently exposed to the agent:"
     SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket) ssh-add -L || echo "no ssh keys detected. is the yubikey plugged in?"
-    
+
     echo "reload complete."
 
 # lists all public and secret gpg keys in the local keyring
@@ -40,7 +41,7 @@ agate-gpg-list ARG="":
     set -euo pipefail
 
     # handles help command
-    if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
+    if [ "{{ ARG }}" = "--help" ] || [ "{{ ARG }}" = "-h" ]; then
         echo "usage: ujust agate-gpg-list"
         echo "lists all public and secret keys currently stored in the local gpg keyring."
         exit 0
@@ -59,7 +60,7 @@ agate-gpg-import TARGET="" FLAG="":
     set -euo pipefail
 
     # handles help command
-    if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ] || [ "{{FLAG}}" = "--help" ]; then
+    if [ "{{ TARGET }}" = "--help" ] || [ "{{ TARGET }}" = "-h" ] || [ "{{ FLAG }}" = "--help" ]; then
         echo "usage: ujust agate-gpg-import [TARGET] [--list-all]"
         echo ""
         echo "patterns:"
@@ -71,13 +72,13 @@ agate-gpg-import TARGET="" FLAG="":
         exit 0
     fi
 
-    TARGET_ARG="{{TARGET}}"
+    TARGET_ARG="{{ TARGET }}"
     LIST_ONLY=0
 
     # checks for the list-all flag in either argument position
-    if [ "{{TARGET}}" = "--list-all" ] || [ "{{FLAG}}" = "--list-all" ]; then
+    if [ "{{ TARGET }}" = "--list-all" ] || [ "{{ FLAG }}" = "--list-all" ]; then
         LIST_ONLY=1
-        [ "{{TARGET}}" = "--list-all" ] && TARGET_ARG="{{FLAG}}"
+        [ "{{ TARGET }}" = "--list-all" ] && TARGET_ARG="{{ FLAG }}"
     fi
 
     show_and_import() {
@@ -100,14 +101,14 @@ agate-gpg-import TARGET="" FLAG="":
     if [[ "$CLEAN_TARGET" =~ ^[0-9a-fA-F]{8,40}$ ]] || [[ "$TARGET_ARG" == *"@"* ]]; then
         MODE_DESC="importing"
         [ $LIST_ONLY -eq 1 ] && MODE_DESC="listing"
-        
+
         echo "mode: $MODE_DESC | target: $TARGET_ARG" >&2
 
         SUCCESS=0
-        for SERVER in {{GPG_SERVERS}}; do
+        for SERVER in {{ GPG_SERVERS }}; do
             echo "querying $SERVER..." >&2
             set +e
-            
+
             if [ $LIST_ONLY -eq 1 ]; then
                 # uses --batch and redirects /dev/null to prevent gpg from waiting for input
                 gpg --batch --no-tty --keyserver-options timeout=10 --keyserver "$SERVER" --search-keys "$TARGET_ARG" < /dev/null 2>/dev/null
@@ -116,7 +117,7 @@ agate-gpg-import TARGET="" FLAG="":
                 IMPORT_OUT=$(gpg --keyserver-options timeout=10 --keyserver "$SERVER" --recv-keys "$CLEAN_TARGET" 2>&1)
                 GPG_EXIT=$?
             fi
-            
+
             stty sane < /dev/tty || true
             set -e
 
@@ -132,7 +133,7 @@ agate-gpg-import TARGET="" FLAG="":
             echo "error: no valid results found on any known servers." >&2
             exit 1
         fi
-        
+
         if [ $LIST_ONLY -eq 0 ] && [[ "$CLEAN_TARGET" =~ ^[0-9a-fA-F]{8,40}$ ]]; then
             echo "=== imported key metadata ===" >&2
             gpg --list-keys "$CLEAN_TARGET"
@@ -169,14 +170,14 @@ agate-gpg-delete ARG="":
     set -euo pipefail
 
     # handles help command
-    if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
+    if [ "{{ ARG }}" = "--help" ] || [ "{{ ARG }}" = "-h" ]; then
         echo "usage: ujust agate-gpg-delete"
         echo "launches an interactive menu to safely delete public and secret keys."
         exit 0
     fi
 
     mapfile -t GPG_KEYS < <(gpg --list-keys --with-colons 2>/dev/null | grep '^pub:' | cut -d':' -f5)
-    
+
     if [ ${#GPG_KEYS[@]} -eq 0 ]; then
         echo "error: no gpg keys found in keyring." >&2
         exit 1
@@ -190,7 +191,7 @@ agate-gpg-delete ARG="":
 
     printf "select key index (or press enter to cancel): " >&2
     read -r KEY_INDEX < /dev/tty
-    
+
     if [ -z "$KEY_INDEX" ]; then
         echo "operation cancelled." >&2
         exit 0
@@ -229,14 +230,14 @@ agate-gpg-edit ARG="":
     set -euo pipefail
 
     # handles help command
-    if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
+    if [ "{{ ARG }}" = "--help" ] || [ "{{ ARG }}" = "-h" ]; then
         echo "usage: ujust agate-gpg-edit"
         echo "launches an interactive menu to edit key properties using the native gpg prompt."
         exit 0
     fi
 
     mapfile -t GPG_KEYS < <(gpg --list-keys --with-colons 2>/dev/null | grep '^pub:' | cut -d':' -f5)
-    
+
     if [ ${#GPG_KEYS[@]} -eq 0 ]; then
         echo "error: no gpg keys found in keyring." >&2
         exit 1
@@ -250,7 +251,7 @@ agate-gpg-edit ARG="":
 
     printf "select key index (or press enter to cancel): " >&2
     read -r KEY_INDEX < /dev/tty
-    
+
     if [ -z "$KEY_INDEX" ]; then
         echo "operation cancelled." >&2
         exit 0
@@ -264,11 +265,11 @@ agate-gpg-edit ARG="":
     SELECTED_KEY="${GPG_KEYS[$KEY_INDEX]}"
 
     echo "launching gpg editor for $SELECTED_KEY. type 'help' for available commands or 'quit' to exit." >&2
-    
+
     set +e
     # routes standard input explicitly to tty to allow interactive editing shell
     gpg --edit-key "$SELECTED_KEY" < /dev/tty
-    
+
     # restores terminal state in case gpg scrambled it
     stty sane < /dev/tty || true
     set -e
@@ -280,7 +281,7 @@ agate-gpg-export-pub TARGET_KEY=DEFAULT_GPG_KEY:
     set -euo pipefail
 
     # handles help command
-    if [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
+    if [ "{{ TARGET_KEY }}" = "--help" ] || [ "{{ TARGET_KEY }}" = "-h" ]; then
         echo "usage: ujust agate-gpg-export-pub [TARGET_KEY]"
         echo ""
         echo "patterns:"
@@ -289,12 +290,12 @@ agate-gpg-export-pub TARGET_KEY=DEFAULT_GPG_KEY:
         exit 0
     fi
 
-    ACTIVE_KEY="{{TARGET_KEY}}"
+    ACTIVE_KEY="{{ TARGET_KEY }}"
 
     # handles interactive public key selection reading directly from tty
     if [ "$ACTIVE_KEY" = "select" ]; then
         mapfile -t GPG_KEYS < <(gpg --list-keys --with-colons 2>/dev/null | grep '^pub:' | cut -d':' -f5)
-        
+
         if [ ${#GPG_KEYS[@]} -eq 0 ]; then
             echo "error: no public gpg keys found." >&2
             exit 1
@@ -308,7 +309,7 @@ agate-gpg-export-pub TARGET_KEY=DEFAULT_GPG_KEY:
 
         printf "select key index: " >&2
         read -r KEY_INDEX < /dev/tty
-        
+
         if [[ ! "$KEY_INDEX" =~ ^[0-9]+$ ]] || [ "$KEY_INDEX" -ge "${#GPG_KEYS[@]}" ]; then
             echo "error: invalid selection." >&2
             exit 1
@@ -324,17 +325,17 @@ agate-gpg-export-pub TARGET_KEY=DEFAULT_GPG_KEY:
             echo "error: wl-copy is missing." >&2
             exit 1
         fi
-        
+
         PUB_KEY=$(gpg --armor --export "$ACTIVE_KEY")
         printf "%s" "$PUB_KEY" | wl-copy || true
-        
+
         # fallback direct injection to klipper via dbus
         if command -v qdbus6 >/dev/null 2>&1; then
             qdbus6 org.kde.klipper /klipper setClipboardContents "$PUB_KEY" >/dev/null 2>&1 || true
         elif command -v qdbus >/dev/null 2>&1; then
             qdbus org.kde.klipper /klipper setClipboardContents "$PUB_KEY" >/dev/null 2>&1 || true
         fi
-        
+
         sleep 0.4
         echo "public key $ACTIVE_KEY copied to clipboard." >&2
     fi
@@ -346,7 +347,7 @@ agate-gpg-publish TARGET_KEY=DEFAULT_GPG_KEY:
     set -euo pipefail
 
     # handles help command
-    if [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
+    if [ "{{ TARGET_KEY }}" = "--help" ] || [ "{{ TARGET_KEY }}" = "-h" ]; then
         echo "usage: ujust agate-gpg-publish [TARGET_KEY]"
         echo ""
         echo "patterns:"
@@ -356,12 +357,12 @@ agate-gpg-publish TARGET_KEY=DEFAULT_GPG_KEY:
         exit 0
     fi
 
-    ACTIVE_KEY="{{TARGET_KEY}}"
+    ACTIVE_KEY="{{ TARGET_KEY }}"
 
     # handles interactive public key selection
     if [ "$ACTIVE_KEY" = "select" ]; then
         mapfile -t GPG_KEYS < <(gpg --list-keys --with-colons 2>/dev/null | grep '^pub:' | cut -d':' -f5)
-        
+
         if [ ${#GPG_KEYS[@]} -eq 0 ]; then
             echo "error: no public gpg keys found." >&2
             exit 1
@@ -375,7 +376,7 @@ agate-gpg-publish TARGET_KEY=DEFAULT_GPG_KEY:
 
         printf "select key index: " >&2
         read -r KEY_INDEX < /dev/tty
-        
+
         if [[ ! "$KEY_INDEX" =~ ^[0-9]+$ ]] || [ "$KEY_INDEX" -ge "${#GPG_KEYS[@]}" ]; then
             echo "error: invalid selection." >&2
             exit 1
@@ -385,7 +386,7 @@ agate-gpg-publish TARGET_KEY=DEFAULT_GPG_KEY:
 
     echo "publishing key $ACTIVE_KEY..." >&2
 
-    for SERVER in {{GPG_SERVERS}}; do
+    for SERVER in {{ GPG_SERVERS }}; do
         echo "sending to $SERVER..." >&2
         set +e
         gpg --keyserver "$SERVER" --send-keys "$ACTIVE_KEY"
@@ -409,7 +410,7 @@ agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
     set -euo pipefail
 
     # handles help command
-    if [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
+    if [ "{{ TARGET_KEY }}" = "--help" ] || [ "{{ TARGET_KEY }}" = "-h" ]; then
         echo "usage: ujust agate-gpg-revoke [TARGET_KEY]"
         echo ""
         echo "patterns:"
@@ -419,12 +420,12 @@ agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
         exit 0
     fi
 
-    ACTIVE_KEY="{{TARGET_KEY}}"
+    ACTIVE_KEY="{{ TARGET_KEY }}"
 
     # handles interactive secret key selection
     if [ "$ACTIVE_KEY" = "select" ]; then
         mapfile -t GPG_KEYS < <(gpg --list-secret-keys --with-colons 2>/dev/null | grep '^sec:' | cut -d':' -f5)
-        
+
         if [ ${#GPG_KEYS[@]} -eq 0 ]; then
             echo "error: no secret gpg keys found. you can only revoke keys you own." >&2
             exit 1
@@ -438,7 +439,7 @@ agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
 
         printf "select key index: " >&2
         read -r KEY_INDEX < /dev/tty
-        
+
         if [[ ! "$KEY_INDEX" =~ ^[0-9]+$ ]] || [ "$KEY_INDEX" -ge "${#GPG_KEYS[@]}" ]; then
             echo "error: invalid selection." >&2
             exit 1
@@ -449,11 +450,11 @@ agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
     REV_FILE="REVOCATION-${ACTIVE_KEY}.asc"
 
     echo "generating revocation certificate for $ACTIVE_KEY..." >&2
-    
+
     set +e
     # executes generation interactively
     gpg --output "$REV_FILE" --gen-revoke "$ACTIVE_KEY" < /dev/tty
-    
+
     # forcefully restores terminal state to prevent carriage return bug (^M) on read
     stty sane < /dev/tty || true
     set -e
@@ -465,7 +466,7 @@ agate-gpg-revoke TARGET_KEY=DEFAULT_GPG_KEY:
 
     echo "success: revocation certificate saved to $REV_FILE" >&2
     echo "keep this file secure. if published, it permanently invalidates the key." >&2
-    
+
     printf "do you want to apply this revocation to your local keyring now? (yes/no): " >&2
     read -r CONFIRM < /dev/tty
 
@@ -484,7 +485,7 @@ agate-encrypt TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
     set -euo pipefail
 
     # handles help command
-    if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ] || [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
+    if [ "{{ TARGET }}" = "--help" ] || [ "{{ TARGET }}" = "-h" ] || [ "{{ TARGET_KEY }}" = "--help" ] || [ "{{ TARGET_KEY }}" = "-h" ]; then
         echo "usage: ujust agate-encrypt [TARGET] [TARGET_KEY]"
         echo ""
         echo "patterns:"
@@ -496,8 +497,8 @@ agate-encrypt TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
         exit 0
     fi
 
-    TARGET_FILE="{{TARGET}}"
-    ACTIVE_KEY="{{TARGET_KEY}}"
+    TARGET_FILE="{{ TARGET }}"
+    ACTIVE_KEY="{{ TARGET_KEY }}"
 
     # reassigns arguments if user omitted file but requested key selection
     if [ "$TARGET_FILE" = "select" ] && [ ! -f "$TARGET_FILE" ]; then
@@ -507,7 +508,7 @@ agate-encrypt TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
 
     if [ "$ACTIVE_KEY" = "select" ]; then
         mapfile -t GPG_KEYS < <(gpg --list-keys --with-colons 2>/dev/null | grep '^pub:' | cut -d':' -f5)
-        
+
         if [ ${#GPG_KEYS[@]} -eq 0 ]; then
             echo "error: no public gpg keys found." >&2
             exit 1
@@ -521,7 +522,7 @@ agate-encrypt TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
 
         printf "select key index: " >&2
         read -r KEY_INDEX < /dev/tty
-        
+
         if [[ ! "$KEY_INDEX" =~ ^[0-9]+$ ]] || [ "$KEY_INDEX" -ge "${#GPG_KEYS[@]}" ]; then
             echo "error: invalid selection." >&2
             exit 1
@@ -560,15 +561,15 @@ agate-encrypt TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
             echo "error: wl-copy is missing." >&2
             exit 1
         fi
-        
+
         printf "%s" "$ENCRYPTED_DATA" | wl-copy || true
-        
+
         if command -v qdbus6 >/dev/null 2>&1; then
             qdbus6 org.kde.klipper /klipper setClipboardContents "$ENCRYPTED_DATA" >/dev/null 2>&1 || true
         elif command -v qdbus >/dev/null 2>&1; then
             qdbus org.kde.klipper /klipper setClipboardContents "$ENCRYPTED_DATA" >/dev/null 2>&1 || true
         fi
-        
+
         sleep 0.4
         echo "success: encrypted text copied to clipboard." >&2
     else
@@ -582,7 +583,7 @@ agate-sign TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
     set -euo pipefail
 
     # handles help command
-    if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ] || [ "{{TARGET_KEY}}" = "--help" ] || [ "{{TARGET_KEY}}" = "-h" ]; then
+    if [ "{{ TARGET }}" = "--help" ] || [ "{{ TARGET }}" = "-h" ] || [ "{{ TARGET_KEY }}" = "--help" ] || [ "{{ TARGET_KEY }}" = "-h" ]; then
         echo "usage: ujust agate-sign [TARGET] [TARGET_KEY]"
         echo ""
         echo "patterns:"
@@ -594,8 +595,8 @@ agate-sign TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
         exit 0
     fi
 
-    TARGET_FILE="{{TARGET}}"
-    ACTIVE_KEY="{{TARGET_KEY}}"
+    TARGET_FILE="{{ TARGET }}"
+    ACTIVE_KEY="{{ TARGET_KEY }}"
 
     if [ "$TARGET_FILE" = "select" ] && [ ! -f "$TARGET_FILE" ]; then
         ACTIVE_KEY="select"
@@ -604,7 +605,7 @@ agate-sign TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
 
     if [ "$ACTIVE_KEY" = "select" ]; then
         mapfile -t GPG_KEYS < <(gpg --list-secret-keys --with-colons 2>/dev/null | grep '^sec:' | cut -d':' -f5)
-        
+
         if [ ${#GPG_KEYS[@]} -eq 0 ]; then
             echo "error: no secret gpg keys found." >&2
             exit 1
@@ -618,7 +619,7 @@ agate-sign TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
 
         printf "select key index: " >&2
         read -r KEY_INDEX < /dev/tty
-        
+
         if [[ ! "$KEY_INDEX" =~ ^[0-9]+$ ]] || [ "$KEY_INDEX" -ge "${#GPG_KEYS[@]}" ]; then
             echo "error: invalid selection." >&2
             exit 1
@@ -653,15 +654,15 @@ agate-sign TARGET="" TARGET_KEY=DEFAULT_GPG_KEY:
             echo "error: wl-copy is missing." >&2
             exit 1
         fi
-        
+
         printf "%s" "$SIGNED_DATA" | wl-copy || true
-        
+
         if command -v qdbus6 >/dev/null 2>&1; then
             qdbus6 org.kde.klipper /klipper setClipboardContents "$SIGNED_DATA" >/dev/null 2>&1 || true
         elif command -v qdbus >/dev/null 2>&1; then
             qdbus org.kde.klipper /klipper setClipboardContents "$SIGNED_DATA" >/dev/null 2>&1 || true
         fi
-        
+
         sleep 0.4
         echo "success: signed text copied to clipboard." >&2
     else
@@ -675,7 +676,7 @@ agate-decrypt TARGET="":
     set -euo pipefail
 
     # handles help command
-    if [ "{{TARGET}}" = "--help" ] || [ "{{TARGET}}" = "-h" ]; then
+    if [ "{{ TARGET }}" = "--help" ] || [ "{{ TARGET }}" = "-h" ]; then
         echo "usage: ujust agate-decrypt [TARGET]"
         echo ""
         echo "patterns:"
@@ -685,7 +686,7 @@ agate-decrypt TARGET="":
         exit 0
     fi
 
-    TARGET_FILE="{{TARGET}}"
+    TARGET_FILE="{{ TARGET }}"
 
     # processes physical file and prints to stdout
     if [ -n "$TARGET_FILE" ]; then
@@ -725,7 +726,7 @@ agate-git-sign ARG="":
     set -euo pipefail
 
     # handles help command
-    if [ "{{ARG}}" = "--help" ] || [ "{{ARG}}" = "-h" ]; then
+    if [ "{{ ARG }}" = "--help" ] || [ "{{ ARG }}" = "-h" ]; then
         echo "usage: ujust agate-git-sign"
         echo ""
         echo "patterns:"
