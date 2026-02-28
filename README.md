@@ -50,11 +50,11 @@ You can switch an existing `bootc`-compatible system to this custom image.
 
 **Rebase Command:**
 ```bash
-sudo rpm-ostree rebase ostree-image-signed:docker://quay.io/fptbb/agate:latest
+sudo bootc switch --enforce-container-sigpolicy quay.io/fptbb/agate:latest
 ```
 or, as an alternative mirror, use Github
 ```bash
-sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/fptbb/agate:latest
+sudo bootc switch --enforce-container-sigpolicy ghcr.io/fptbb/agate:latest
 ```
 After the command completes, reboot your system. You can check the status at any time with `sudo bootc status`.
 
