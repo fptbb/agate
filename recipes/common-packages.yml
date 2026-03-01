@@ -79,6 +79,7 @@ modules:
       - whatpulse.sh
       - opensnitch.sh
       - fido2.sh
+      - appimage-updater.sh
   - type: systemd
     system:
       enabled:
