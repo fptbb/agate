@@ -10,6 +10,10 @@ workflow:
         # Daily Builds
         - if: $CI_PIPELINE_SOURCE == "schedule"
 
+default:
+    artifacts:
+        expire_in: 1 day
+
 variables:
     IMAGE_NAME: "agate"
     UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
@@ -38,6 +42,7 @@ check-update:
     rules:
         - if: $CI_PIPELINE_SOURCE == "schedule"
     artifacts:
+        expire_in: 1 day
         reports:
             dotenv: build.env
     script:
