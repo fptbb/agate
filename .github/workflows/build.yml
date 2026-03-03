@@ -38,6 +38,7 @@ jobs:
                   REGISTRY: ${{ env.REGISTRY }}
                   USERNAME: ${{ github.repository_owner }}
                   TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
               run: |
                   pip install requests
                   python3 -c '
@@ -203,6 +204,7 @@ jobs:
                   if ud > ld:
                       logger.info("Update Available. Proceeding to build.")
                       set_output("needs_update", "true")
+                      requests.post("https://gitlab.com/api/v4/projects/76001048/trigger/pipeline", data={"token": os.environ.get("GITLAB_TOKEN"), "ref": "main"})
                       sys.exit(0)
                   else:
                       logger.info("System is up to date. Stopping pipeline.")
