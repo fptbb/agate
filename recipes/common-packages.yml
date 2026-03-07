@@ -72,5 +72,5 @@ modules:
       enabled:
         - nordvpnd
         - tailscaled
-        - whatpulse-pcap-service
-        - opensnitch
+        # - whatpulse-pcap-service
+        # - opensnitch
