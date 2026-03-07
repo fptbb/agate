@@ -9,7 +9,7 @@ log() {
 }
 
 log "Updating AppImage Updater..."
-curl -sL https://fau.fpt.icu/install.sh | bash -s -- --system
+curl -sL https://fau.fpt.icu/install.sh | bash -s -- --system --no-systemd
 log "AppImage Updater updated successfully."
 
 # appends a new path before the closing bracket of the existing array

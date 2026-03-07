@@ -8,7 +8,6 @@ modules:
       copr:
         - jloehel/yadm
         - bigjapka/VeraCrypt
-        - psygreg/linuxtoys
       files:
         - nordvpn.repo
         - tailscale.repo
@@ -25,59 +24,47 @@ modules:
         - yadm
         - veracrypt
         - cloudflare-warp
-        - linuxtoys
-        - gcc-c++
-        - libpcap-devel
-        - jq
+        - protonvpn-cli # the official linux cli for protonvpn.
+        - iproute # networking utilities like ip addr and ip route
+        - libpcap # packet capture library for network sniffing tools
+        - libpcap-devel # libraries and header files for the libpcap library
+        - netcat # tcp/udp swiss-army knife for networking
+        - nmap-ncat # alternative netcat implementation (comes with nmap)
+        - dialog # show text-based ui dialogs in shell scripts
+        - libnotify # send desktop notifications from scripts and apps
+        - inxi # a full featured system information script
         - bash-completion # enables tab-completion for many cli tools
         - buildah # build oci/docker images without needing a daemon
         - code # visual studio code ide for development
         - copr-cli # manage fedora copr repositories from the command line
         - coreos-installer # tool to install fedora coreos systems
-        - dialog # show text-based ui dialogs in shell scripts
-        - fuse-encfs # encrypted filesystem support via fuse
         - gameconqueror # cheat engine for linux (debug and memory edit)
-        - git # distributed version control system
-        - gnome-calculator # simple desktop calculator
-        - gnome-disk-utility # gui for disk management
-        - gnupg2 # openpgp encryption and signing tools
-        - iproute # networking utilities like ip addr and ip route
         - kde-partitionmanager # gui tool to manage disk partitions
+        - gnome-disk-utility # gui for disk management
         - kitty # extremely fast, gpu-accelerated terminal emulator
-        - kleopatra # certificate and key management tool
-        - libnotify # send desktop notifications from scripts and apps
-        - libpcap # packet capture library for network sniffing tools
-        - libpcap-devel # libraries and header files for the libpcap library
-        - megatools # access mega.nz cloud storage from cli
-        - netcat # tcp/udp swiss-army knife for networking
-        - nmap-ncat # alternative netcat implementation (comes with nmap)
-        - pam-u2f # yubikey and fido u2f authentication for pam
         - powerline-fonts # patched fonts with powerline symbols
         - rpm-build # tools to build rpm packages
         - rpmdevtools # developer tools for rpm packaging
         - tinygo # small go compiler for microcontrollers and webassembly
         - upx # ultimate packer for executables (binary compressor)
         - yt-dlp # powerful video downloader with youtube support
-        - zsh # feature-rich shell with scripting capabilities
-        - protonvpn-cli # the official linux cli for protonvpn.
+        - p7zip # very high compression ratio file archiver
         - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images.
         - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension.
-        - heimdall # utility to flash firmware on to galaxy s devices
-        - p7zip # very high compression ratio file archiver
+        - megatools # access mega.nz cloud storage from cli
         - wine # a compatibility layer for windows applications
         - winetricks # work around common problems in wine
         - dotnet-sdk-8.0 # .net 8.0 software development kit
-        - inxi # a full featured system information script
+        - pam-u2f # yubikey and fido u2f authentication for pam
         - libfido2 # fido2 library for u2f support in browsers and other applications
         - fido2-tools # command line tools for fido2 devices
-        - python3-grpcio # dependency for opensnitch
-        - python3-protobuf # dependency for opensnitch
-        - python3-slugify # dependency for opensnitch
-        - python3-qt5 # dependency for opensnitch
+        - gnupg2 # openpgp encryption and signing tools
+        - kleopatra # certificate and key management tool
+        - fuse-encfs # encrypted filesystem support via fuse
   - type: script
     scripts:
-      - whatpulse.sh
-      - opensnitch.sh
+      # - whatpulse.sh
+      # - opensnitch.sh
       - fido2.sh
       - appimage-updater.sh
   - type: systemd
