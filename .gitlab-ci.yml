@@ -19,10 +19,6 @@ variables:
     UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
     UPSTREAM_REGISTRY: "ghcr.io"
 
-.anchors:
-    skip-unforced: &skip-unforced
-        if: $CI_PIPELINE_SOURCE == "schedule" && $FORCE_BUILD != "true"
-        when: never
 
 .python-job:
     image: python:3-alpine
@@ -227,8 +223,11 @@ check-update:
 
 build-image:
     stage: build
+    needs:
+        - job: check-update
+          artifacts: true
+          optional: true
     rules:
-        - *skip-unforced
         - when: on_success
     tags:
         - saas-linux-2xlarge-amd64
@@ -249,6 +248,12 @@ build-image:
         DOCKER_TLS_VERIFY: 1
         DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
     before_script:
+        # On scheduled pipelines, skip build if no update was found
+        - |
+            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
+              echo "No update found. Skipping build."
+              exit 0
+            fi
         # Pulls secure files into the build
         - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
         - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
@@ -264,11 +269,21 @@ publish-metadata:
     variables:
         REGCTL_VERSION: v0.5.0
         DEST_REPO: "$BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME:artifacthub.io"
+    needs:
+        - job: check-update
+          artifacts: true
+          optional: true
+        - job: build-image
     rules:
-        - *skip-unforced
         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
         - if: $CI_COMMIT_TAG
     before_script:
+        # On scheduled pipelines, skip if no update was found
+        - |
+            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
+              echo "No update found. Skipping publish."
+              exit 0
+            fi
         - apk add --no-cache curl
         - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
         - chmod +x /usr/local/bin/regctl
@@ -290,14 +305,24 @@ publish-metadata:
 cleanup-old-tags:
     extends: .python-job
     stage: cleanup
+    needs:
+        - job: check-update
+          artifacts: true
+          optional: true
+        - job: build-image
     rules:
-        - *skip-unforced
         - when: on_success
     variables:
         MAX_AGE_DAYS: "7"
         MAX_KEEP: "5"
         DRY_RUN: "false"
     script:
+        # On scheduled pipelines, skip if no update was found
+        - |
+            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
+              echo "No update found. Skipping cleanup."
+              exit 0
+            fi
         - |
             python3 -c '
             import os

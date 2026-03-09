@@ -52,4 +52,6 @@ agate-spicetify:
         spicetify config prefs_path "$FLATPAK_PREFS"
     fi
 
+    spicetify update
     spicetify restore backup apply
+    curl -fsSL https://raw.githubusercontent.com/spicetify/spicetify-marketplace/main/resources/install.sh | sh
