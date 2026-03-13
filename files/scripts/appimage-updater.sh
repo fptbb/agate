@@ -10,7 +10,7 @@ log() {
 
 log "Updating AppImage Updater..."
 # Use alternative url with jsdelivr to avoid github rate limits
-curl -sL https://cdn.jsdelivr.net/gh/fptbb/fp-appimage-updater@1.0.6/install.sh | bash -s -- --system --no-systemd
+curl -sL https://cdn.jsdelivr.net/gh/fptbb/fp-appimage-updater@latest/install.sh | bash -s -- --system --no-systemd
 log "AppImage Updater updated successfully."
 
 # appends a new path before the closing bracket of the existing array
