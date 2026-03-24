@@ -24,7 +24,7 @@ dotfiles-setup:
     chmod 600 ~/.config/chezmoi/key.txt
 
     # Apply first, then we overwrite the systemd files
-    chezmoi apply --non-interactive
+    chezmoi apply
 
     # Re-creates the systemd sync services
     @printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ujust dotfiles-re-add\nRuntimeMaxSec=300\nStandardOutput=journal\nStandardError=journal\n" > ~/.config/systemd/user/dotfiles-upload.service
