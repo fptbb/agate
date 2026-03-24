@@ -1,6 +1,5 @@
 # bootstraps dotfiles from private gitlab repository
 dotfiles-setup:
-    #!/usr/bin/bash
     mkdir -p ~/.ssh ~/.config/chezmoi ~/.config/systemd/user
 
     @echo "Paste your GitLab SSH private key and press Ctrl+D:"
@@ -42,13 +41,13 @@ dotfiles-apply:
 dotfiles-cd:
     chezmoi cd
 
-# tracks a new file or folder
-dotfiles-add target:
-    chezmoi add {{ target }}
+# tracks new files or folders
+dotfiles-add +targets:
+    chezmoi add {{targets}}
 
-# tracks a new sensitive file with age encryption
-dotfiles-add-secret target:
-    chezmoi add --encrypt {{ target }}
+# tracks new sensitive files with age encryption
+dotfiles-add-secret +targets:
+    chezmoi add --encrypt {{targets}}
 
 # absorbs changes made directly to tracked files in the home directory
 dotfiles-re-add:
@@ -57,5 +56,5 @@ dotfiles-re-add:
 # commits and pushes local changes to gitlab
 dotfiles-push message:
     chezmoi git -- add .
-    chezmoi git -- commit -m "{{ message }}"
+    chezmoi git -- commit -m "{{message}}"
     chezmoi git -- push -u origin main
