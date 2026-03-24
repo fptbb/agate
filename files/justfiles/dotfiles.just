@@ -85,7 +85,3 @@ dotfiles-push message:
     chezmoi git -- add .
     chezmoi git -- commit -m "{{ message }}"
     chezmoi git -- push -u origin main
-
-# formats this justfile
-dotfiles-fmt:
-    just --fmt
