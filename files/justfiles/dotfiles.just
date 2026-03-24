@@ -1,5 +1,4 @@
 # Paths to the tracking configuration files
-
 TRACKED_FILE := "/home/fptbb/.bin/tracked"
 TRACKED_ENC_FILE := "/home/fptbb/.bin/tracked_encrypted"
 
@@ -23,26 +22,31 @@ dotfiles-setup:
     # decrypts the repository key
     age -d -o ~/.config/chezmoi/key.txt ~/.local/share/chezmoi/age-private-key.enc
     chmod 600 ~/.config/chezmoi/key.txt
-
+    
     chezmoi apply
 
     # Re-creates the systemd sync services using ujust
-    @printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ujust dotfiles-re-add\n" > ~/.config/systemd/user/chezmoi-re-add.service
+    # Added TimeoutStartSec and RuntimeMaxSec to prevent hanging services
+    @printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ujust dotfiles-re-add\nRuntimeMaxSec=300\nTimeoutStartSec=300\n" > ~/.config/systemd/user/chezmoi-re-add.service
     @printf "[Unit]\nDescription=Run dotfiles sync periodically\n\n[Timer]\nOnBootSec=4h\nOnUnitActiveSec=4h\n\n[Install]\nWantedBy=timers.target\n" > ~/.config/systemd/user/chezmoi-re-add.timer
-
+    
+    # Permissions and SELinux fix for Atomic Fedora
+    chmod 644 ~/.config/systemd/user/chezmoi-re-add.*
+    -restorecon -v ~/.config/systemd/user/chezmoi-re-add.*
+    
     systemctl --user daemon-reload
-
+    
     @echo ""
     @echo "Setup complete. To enable the background sync, run:"
     @echo "systemctl --user enable --now chezmoi-re-add.timer"
 
 # fetches updates from gitlab and applies them
 dotfiles-update:
-    chezmoi update
+    chezmoi update --non-interactive
 
 # applies pending local changes to the system
 dotfiles-apply:
-    chezmoi apply
+    chezmoi apply --non-interactive
 
 # opens a shell inside the dotfiles source directory
 dotfiles-cd:
@@ -50,38 +54,44 @@ dotfiles-cd:
 
 # tracks new files or folders
 dotfiles-add +targets:
-    chezmoi add --recursive {{ targets }}
+    chezmoi add --recursive {{targets}}
 
 # tracks new sensitive files
 dotfiles-add-secret +targets:
-    chezmoi add --encrypt --recursive {{ targets }}
+    chezmoi add --encrypt --recursive {{targets}}
 
 # absorbs changes AND discovers new files based on tracking lists
 dotfiles-re-add:
-    chezmoi re-add
+    # Run with --non-interactive to prevent hanging on background prompts
+    chezmoi re-add --non-interactive
+    echo "Re-adding tracked files from configuration lists..."
     @# Standard tracking
-    @if [ -f {{ TRACKED_FILE }} ]; then \
+    @if [ -f {{TRACKED_FILE}} ]; then \
         while IFS= read -r line || [ -n "$line" ]; do \
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
                 echo "Syncing standard: $line"; \
-                chezmoi add --recursive "$line"; \
+                chezmoi add --recursive --non-interactive "$line"; \
             fi; \
-        done < {{ TRACKED_FILE }}; \
+        done < {{TRACKED_FILE}}; \
     fi
     @# Encrypted tracking
-    @if [ -f {{ TRACKED_ENC_FILE }} ]; then \
+    @if [ -f {{TRACKED_ENC_FILE}} ]; then \
         while IFS= read -r line || [ -n "$line" ]; do \
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
                 echo "Syncing encrypted: $line"; \
-                chezmoi add --encrypt --recursive "$line"; \
+                chezmoi add --encrypt --recursive --non-interactive "$line"; \
             fi; \
-        done < {{ TRACKED_ENC_FILE }}; \
+        done < {{TRACKED_ENC_FILE}}; \
     fi
 
 # commits and pushes local changes to gitlab
 dotfiles-push message:
     chezmoi git -- add .
-    chezmoi git -- commit -m "{{ message }}"
+    chezmoi git -- commit -m "{{message}}"
     chezmoi git -- push -u origin main
+
+# formats this justfile
+dotfiles-fmt:
+    just --fmt
