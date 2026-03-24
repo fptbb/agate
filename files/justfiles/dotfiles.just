@@ -1,4 +1,5 @@
 # Paths to the tracking configuration files
+
 TRACKED_FILE := "/home/fptbb/.bin/tracked"
 TRACKED_ENC_FILE := "/home/fptbb/.bin/tracked_encrypted"
 
@@ -42,40 +43,40 @@ dotfiles-cd:
 
 # tracks new files or folders
 dotfiles-add +targets:
-    chezmoi add --recursive {{targets}}
+    chezmoi add --recursive {{ targets }}
 
 # tracks new sensitive files
 dotfiles-add-secret +targets:
-    chezmoi add --encrypt --recursive {{targets}}
+    chezmoi add --encrypt --recursive {{ targets }}
 
 # absorbs changes AND discovers new files based on both tracked files
 dotfiles-re-add:
     chezmoi re-add
     @# Standard tracking
-    @if [ -f {{TRACKED_FILE}} ]; then \
+    @if [ -f {{ TRACKED_FILE }} ]; then \
         while IFS= read -r line || [ -n "$line" ]; do \
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
                 echo "Syncing standard: $line"; \
                 chezmoi add --recursive "$line"; \
             fi; \
-        done < {{TRACKED_FILE}}; \
+        done < {{ TRACKED_FILE }}; \
     fi
     @# Encrypted tracking
-    @if [ -f {{TRACKED_ENC_FILE}} ]; then \
+    @if [ -f {{ TRACKED_ENC_FILE }} ]; then \
         while IFS= read -r line || [ -n "$line" ]; do \
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
                 echo "Syncing encrypted: $line"; \
                 chezmoi add --encrypt --recursive "$line"; \
             fi; \
-        done < {{TRACKED_ENC_FILE}}; \
+        done < {{ TRACKED_ENC_FILE }}; \
     fi
 
 # commits and pushes local changes to gitlab
 dotfiles-push message:
     chezmoi git -- add .
-    chezmoi git -- commit -m "{{message}}"
+    chezmoi git -- commit -m "{{ message }}"
     chezmoi git -- push -u origin main
 
 # formats this justfile
