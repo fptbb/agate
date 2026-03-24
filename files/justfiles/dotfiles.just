@@ -14,20 +14,27 @@ dotfiles-setup:
 
     GIT_SSH_COMMAND="ssh -i ~/.ssh/dotfiles_key -o IdentitiesOnly=yes" chezmoi init git@gitlab.com:fptbb/dotfiles.git
 
+    # isolates git repository config
     chezmoi git -- config core.sshCommand "ssh -i ~/.ssh/dotfiles_key -o IdentitiesOnly=yes"
     chezmoi git -- config gpg.format ssh
     chezmoi git -- config user.signingkey ~/.ssh/dotfiles_key.pub
     chezmoi git -- config commit.gpgsign true
 
+    # decrypts the repository key
     age -d -o ~/.config/chezmoi/key.txt ~/.local/share/chezmoi/age-private-key.enc
     chmod 600 ~/.config/chezmoi/key.txt
+
     chezmoi apply
 
-    @printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/just -f %h/justfile dotfiles-re-add\n" > ~/.config/systemd/user/chezmoi-re-add.service
+    # Re-creates the systemd sync services using ujust
+    @printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ujust dotfiles-re-add\n" > ~/.config/systemd/user/chezmoi-re-add.service
     @printf "[Unit]\nDescription=Run dotfiles sync periodically\n\n[Timer]\nOnBootSec=4h\nOnUnitActiveSec=4h\n\n[Install]\nWantedBy=timers.target\n" > ~/.config/systemd/user/chezmoi-re-add.timer
 
+    systemctl --user daemon-reload
+
     @echo ""
-    @echo "WARNING: Enable the service: systemctl --user enable --now chezmoi-re-add.timer"
+    @echo "Setup complete. To enable the background sync, run:"
+    @echo "systemctl --user enable --now chezmoi-re-add.timer"
 
 # fetches updates from gitlab and applies them
 dotfiles-update:
@@ -49,7 +56,7 @@ dotfiles-add +targets:
 dotfiles-add-secret +targets:
     chezmoi add --encrypt --recursive {{ targets }}
 
-# absorbs changes AND discovers new files based on both tracked files
+# absorbs changes AND discovers new files based on tracking lists
 dotfiles-re-add:
     chezmoi re-add
     @# Standard tracking
