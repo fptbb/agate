@@ -8,6 +8,7 @@ modules:
       copr:
         - jloehel/yadm
         - bigjapka/VeraCrypt
+        - fptbb/fp-appimage-updater
       files:
         - nordvpn.repo
         - tailscale.repo
@@ -61,6 +62,7 @@ modules:
         - gnupg2 # openpgp encryption and signing tools
         - kleopatra # certificate and key management tool
         - fuse-encfs # encrypted filesystem support via fuse
+        - fp-appimage-updater # declarative appimage updater
   - type: script
     scripts:
       # - whatpulse.sh
