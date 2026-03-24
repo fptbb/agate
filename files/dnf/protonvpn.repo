@@ -6,4 +6,3 @@ type=rpm
 repo_gpgcheck=1
 gpgcheck=1
 gpgkey=https://repo.protonvpn.com/fedora-$releasever-stable/public_key.asc
-zchunk=False

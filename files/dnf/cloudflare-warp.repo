@@ -5,4 +5,3 @@ enabled=1
 type=rpm
 gpgcheck=1
 gpgkey=https://pkg.cloudflareclient.com/pubkey.gpg
-zchunk=False

@@ -5,4 +5,3 @@ enabled=1
 type=rpm
 gpgcheck=1
 gpgkey=https://repo.nordvpn.com/gpg/nordvpn_public.asc
-zchunk=False
