@@ -44,11 +44,11 @@ dotfiles-cd:
 
 # tracks a new file or folder
 dotfiles-add target:
-    chezmoi add {{target}}
+    chezmoi add {{ target }}
 
 # tracks a new sensitive file with age encryption
 dotfiles-add-secret target:
-    chezmoi add --encrypt {{target}}
+    chezmoi add --encrypt {{ target }}
 
 # absorbs changes made directly to tracked files in the home directory
 dotfiles-re-add:
@@ -57,5 +57,5 @@ dotfiles-re-add:
 # commits and pushes local changes to gitlab
 dotfiles-push message:
     chezmoi git -- add .
-    chezmoi git -- commit -m "{{message}}"
+    chezmoi git -- commit -m "{{ message }}"
     chezmoi git -- push -u origin main
