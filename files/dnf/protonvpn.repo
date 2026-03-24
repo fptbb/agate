@@ -1,0 +1,9 @@
+[protonvpn-fedora-stable]
+name=ProtonVPN Fedora Stable repository
+baseurl=https://repo.protonvpn.com/fedora-$releasever-stable/
+enabled=1
+type=rpm
+repo_gpgcheck=1
+gpgcheck=1
+gpgkey=https://repo.protonvpn.com/fedora-$releasever-stable/public_key.asc
+zchunk=False

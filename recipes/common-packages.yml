@@ -1,4 +1,3 @@
----
 # yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
 
 modules:
@@ -13,9 +12,13 @@ modules:
         - nordvpn.repo
         - tailscale.repo
         - cloudflare-warp.repo
+        - vscode.repo
+        - protonvpn.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
         - https://pkg.cloudflareclient.com/pubkey.gpg
+        - https://packages.microsoft.com/keys/microsoft.asc
+        - https://repo.protonvpn.com/fedora-41-stable/public_key.asc
     install:
       skip-unavailable: true
       skip-broken: true
@@ -25,7 +28,7 @@ modules:
         - yadm
         - veracrypt
         - cloudflare-warp
-        - protonvpn-cli # the official linux cli for protonvpn.
+        - protonvpn-cli # the official linux cli for protonvpn
         - iproute # networking utilities like ip addr and ip route
         - libpcap # packet capture library for network sniffing tools
         - libpcap-devel # libraries and header files for the libpcap library
@@ -50,8 +53,8 @@ modules:
         - upx # ultimate packer for executables (binary compressor)
         - yt-dlp # powerful video downloader with youtube support
         - p7zip # very high compression ratio file archiver
-        - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images.
-        - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension.
+        - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images
+        - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension
         - megatools # access mega.nz cloud storage from cli
         - wine # a compatibility layer for windows applications
         - winetricks # work around common problems in wine
