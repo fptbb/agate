@@ -40,7 +40,7 @@ dotfiles-setup:
 dotfiles-re-add:
     @echo "Starting dotfiles sync engine..."
     # Update existing files
-    chezmoi re-add --non-interactive
+    chezmoi re-add
 
     @# Standard tracking
     @if [ -f {{ TRACKED_FILE }} ]; then \
@@ -49,7 +49,7 @@ dotfiles-re-add:
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
                 echo "Syncing: $line"; \
-                chezmoi add --recursive --non-interactive "$line"; \
+                chezmoi add --recursive "$line"; \
             fi; \
         done < {{ TRACKED_FILE }}; \
     else \
@@ -62,7 +62,7 @@ dotfiles-re-add:
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
                 echo "Syncing encrypted: $line"; \
-                chezmoi add --encrypt --recursive --non-interactive "$line"; \
+                chezmoi add --encrypt --recursive "$line"; \
             fi; \
         done < {{ TRACKED_ENC_FILE }}; \
     fi
@@ -70,10 +70,10 @@ dotfiles-re-add:
 
 # Standard maintenance commands
 dotfiles-update:
-    chezmoi update --non-interactive
+    chezmoi update
 
 dotfiles-apply:
-    chezmoi apply --non-interactive
+    chezmoi apply
 
 dotfiles-cd:
     chezmoi cd
