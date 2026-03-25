@@ -13,12 +13,10 @@ modules:
         - tailscale.repo
         - cloudflare-warp.repo
         - vscode.repo
-        - protonvpn.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
         - https://pkg.cloudflareclient.com/pubkey.gpg
         - https://packages.microsoft.com/keys/microsoft.asc
-        - https://repo.protonvpn.com/fedora-41-stable/public_key.asc
     install:
       skip-unavailable: true
       skip-broken: true
@@ -28,7 +26,6 @@ modules:
         - yadm
         - veracrypt
         - cloudflare-warp
-        - proton-vpn-cli # the official linux cli for protonvpn
         - iproute # networking utilities like ip addr and ip route
         - libpcap # packet capture library for network sniffing tools
         - libpcap-devel # libraries and header files for the libpcap library
@@ -72,10 +69,12 @@ modules:
       # - opensnitch.sh
       - fido2.sh
       - appimage-updater.sh
+      - install-protonvpn.sh
   - type: systemd
     system:
       enabled:
         - nordvpnd
         - tailscaled
+        # - proton-vpn-daemon
         # - whatpulse-pcap-service
         # - opensnitch
