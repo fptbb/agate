@@ -28,7 +28,7 @@ modules:
         - yadm
         - veracrypt
         - cloudflare-warp
-        - protonvpn-cli # the official linux cli for protonvpn
+        - proton-vpn-cli # the official linux cli for protonvpn
         - iproute # networking utilities like ip addr and ip route
         - libpcap # packet capture library for network sniffing tools
         - libpcap-devel # libraries and header files for the libpcap library
