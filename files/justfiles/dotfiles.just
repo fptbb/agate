@@ -1,6 +1,6 @@
-# Use absolute paths for background service reliability
+# defines absolute paths dynamically based on the current user environment
 
-HOME_DIR := "/home/fptbb"
+HOME_DIR := env_var("HOME")
 TRACKED_FILE := HOME_DIR + "/.bin/tracked"
 TRACKED_ENC_FILE := HOME_DIR + "/.bin/tracked_encrypted"
 
@@ -23,10 +23,8 @@ dotfiles-setup:
     age -d -o ~/.config/chezmoi/key.txt ~/.local/share/chezmoi/age-private-key.enc
     chmod 600 ~/.config/chezmoi/key.txt
 
-    # Apply first, then we overwrite the systemd files
     chezmoi apply
 
-    # Re-creates the systemd sync services
     @printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ujust dotfiles-re-add\nRuntimeMaxSec=300\nStandardOutput=journal\nStandardError=journal\n" > ~/.config/systemd/user/dotfiles-upload.service
     @printf "[Unit]\nDescription=Run dotfiles sync periodically\n\n[Timer]\nOnBootSec=4h\nOnUnitActiveSec=4h\n\n[Install]\nWantedBy=timers.target\n" > ~/.config/systemd/user/dotfiles-upload.timer
 
@@ -36,49 +34,88 @@ dotfiles-setup:
 
     @echo "Setup complete. Services created and timer enabled."
 
-# absorbs changes AND discovers new files based on tracking lists
+# absorbs changes, discovers new files, and cleans up orphans
 dotfiles-re-add:
     @echo "Starting dotfiles sync engine..."
-    # Update existing files
+
     chezmoi re-add
 
-    @# Standard tracking
     @if [ -f {{ TRACKED_FILE }} ]; then \
         echo "Reading {{ TRACKED_FILE }}..."; \
         while IFS= read -r line || [ -n "$line" ]; do \
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
-                echo "Syncing: $line"; \
                 chezmoi add --recursive "$line"; \
             fi; \
         done < {{ TRACKED_FILE }}; \
-    else \
-        echo "Warning: {{ TRACKED_FILE }} not found."; \
     fi
 
-    @# Encrypted tracking
     @if [ -f {{ TRACKED_ENC_FILE }} ]; then \
+        echo "Reading {{ TRACKED_ENC_FILE }}..."; \
         while IFS= read -r line || [ -n "$line" ]; do \
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi; \
             if [ -e "$line" ]; then \
-                echo "Syncing encrypted: $line"; \
                 chezmoi add --encrypt --recursive "$line"; \
             fi; \
         done < {{ TRACKED_ENC_FILE }}; \
     fi
+
+    @echo "Cleaning up orphaned files..."
+    @chezmoi managed | while read -r tracked_path; do \
+        if [ ! -e "$HOME/$tracked_path" ]; then \
+            echo "Removing orphaned file from source: $tracked_path"; \
+            chezmoi forget "$HOME/$tracked_path"; \
+        fi; \
+    done
+
     @echo "Sync engine finished."
 
-# Standard maintenance commands
+# fetches updates from gitlab and applies them
 dotfiles-update:
     chezmoi update
 
+# applies pending local changes to the system
 dotfiles-apply:
     chezmoi apply
 
+# opens a shell inside the dotfiles source directory
 dotfiles-cd:
     chezmoi cd
 
+# tracks new files or folders
+dotfiles-add +targets:
+    chezmoi add --recursive {{ targets }}
+
+# tracks new sensitive files
+dotfiles-add-secret +targets:
+    chezmoi add --encrypt --recursive {{ targets }}
+
+# removes files from source state tracking
+dotfiles-forget +targets:
+    chezmoi forget {{ targets }}
+
+# commits and pushes local changes to gitlab
 dotfiles-push message:
     chezmoi git -- add .
     chezmoi git -- commit -m "{{ message }}"
     chezmoi git -- push -u origin main
+
+# shows modified files pending sync
+dotfiles-status:
+    chezmoi status
+
+# shows line-by-line differences
+dotfiles-diff:
+    chezmoi diff
+
+# opens file in secure edit mode
+dotfiles-edit target:
+    chezmoi edit {{ target }}
+
+# tails background sync logs
+dotfiles-logs:
+    journalctl --user -u dotfiles-upload.service -n 50 -f
+
+# opens tracking lists in default editor
+dotfiles-edit-lists:
+    ${EDITOR:-nvim} {{ TRACKED_FILE }} {{ TRACKED_ENC_FILE }}
