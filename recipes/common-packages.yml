@@ -26,6 +26,7 @@ modules:
         - yadm
         - veracrypt
         - cloudflare-warp
+        - fp-appimage-updater # declarative appimage updater
         - iproute # networking utilities like ip addr and ip route
         - libpcap # packet capture library for network sniffing tools
         - libpcap-devel # libraries and header files for the libpcap library
@@ -62,7 +63,7 @@ modules:
         - gnupg2 # openpgp encryption and signing tools
         - kleopatra # certificate and key management tool
         - fuse-encfs # encrypted filesystem support via fuse
-        - fp-appimage-updater # declarative appimage updater
+        - expect # automate interactive applications with scripts
   - type: script
     scripts:
       # - whatpulse.sh
