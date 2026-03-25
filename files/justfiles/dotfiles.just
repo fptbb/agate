@@ -1,4 +1,4 @@
-# global configuration with environment variable fallbacks
+# defines global configuration with environment variable fallbacks
 
 HOME_DIR := env_var("HOME")
 TRACKED_FILE := env_var_or_default("DOTFILES_TRACKED", HOME_DIR + "/.bin/tracked")
@@ -11,6 +11,7 @@ AGE_PASS := env_var_or_default("DOTFILES_AGE_PASS", "")
 # bootstraps dotfiles from private gitlab repository
 dotfiles-setup:
     #!/usr/bin/env bash
+    set -e
     mkdir -p ~/.ssh ~/.config/chezmoi ~/.config/systemd/user
 
     # uses existing ssh key if available
@@ -25,7 +26,7 @@ dotfiles-setup:
     ssh-keygen -y -f "{{ SSH_KEY_PATH }}" > "{{ SSH_KEY_PATH }}.pub"
     ssh-keyscan gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
 
-    GIT_SSH_COMMAND="ssh -i {{ SSH_KEY_PATH }} -o IdentitiesOnly=yes" chezmoi init git@gitlab.com:fptbb/dotfiles.git > /dev/null 2>&1
+    GIT_SSH_COMMAND="ssh -i {{ SSH_KEY_PATH }} -o IdentitiesOnly=yes" chezmoi init git@gitlab.com:fptbb/dotfiles.git
 
     # isolates git repository config
     chezmoi git -- config core.sshCommand "ssh -i {{ SSH_KEY_PATH }} -o IdentitiesOnly=yes"
@@ -36,7 +37,7 @@ dotfiles-setup:
     # decrypts the repository key using automated prompt if variable is set
     if [ -n "{{ AGE_PASS }}" ]; then
         if command -v expect >/dev/null 2>&1; then
-            expect -c "spawn age -d -o $HOME/.config/chezmoi/key.txt $HOME/.local/share/chezmoi/age-private-key.enc; expect \"Enter passphrase:\"; send \"{{ AGE_PASS }}\r\"; expect eof" > /dev/null 2>&1
+            expect -c "spawn age -d -o $HOME/.config/chezmoi/key.txt $HOME/.local/share/chezmoi/age-private-key.enc; expect \"Enter passphrase:\"; send \"{{ AGE_PASS }}\r\"; expect eof"
         else
             echo "warning: expect is required for non-interactive decryption. falling back to interactive prompt."
             age -d -o ~/.config/chezmoi/key.txt ~/.local/share/chezmoi/age-private-key.enc
@@ -46,7 +47,7 @@ dotfiles-setup:
     fi
     chmod 600 ~/.config/chezmoi/key.txt
 
-    chezmoi apply --non-interactive > /dev/null 2>&1
+    chezmoi apply --force
 
     # re-creates the systemd sync services
     printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ujust dotfiles-sync\nRuntimeMaxSec=300\nStandardOutput=journal\nStandardError=journal\n" > ~/.config/systemd/user/dotfiles-upload.service
@@ -64,6 +65,7 @@ dotfiles-setup:
 # executes numerical shell scripts after setup
 dotfiles-bootstrap:
     #!/usr/bin/env bash
+    set -e
     if [ "{{ SKIP_BOOTSTRAP }}" = "1" ] || [ "{{ SKIP_BOOTSTRAP }}" = "true" ]; then
         echo "Skipping bootstrap due to SKIP_BOOTSTRAP variable."
         exit 0
@@ -88,77 +90,146 @@ dotfiles-bootstrap:
 # absorbs changes, discovers new files, and purges untracked/deleted files
 dotfiles-sync:
     #!/usr/bin/env bash
+    set -e
     echo "Starting dotfiles sync engine..."
 
     TRACKED="{{ TRACKED_FILE }}"
     TRACKED_ENC="{{ TRACKED_ENC_FILE }}"
 
-    # silences output to keep logs clean
-    chezmoi re-add --non-interactive > /dev/null 2>&1
+    echo "=> Running chezmoi re-add..."
+    chezmoi re-add --force
 
+    # reads tracking lists into arrays directly supporting spaces in paths
+    TRACKED_LIST=()
     if [ -f "$TRACKED" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
-            for expanded in $line; do
-                if [ -e "$expanded" ]; then
-                    chezmoi add --recursive --non-interactive "$expanded" > /dev/null 2>&1
-                fi
-            done
+            if [[ "$line" == /* ]]; then
+                expanded="$line"
+            elif [[ "$line" == ~* ]]; then
+                expanded="${line/#\~/$HOME}"
+            else
+                expanded="$HOME/$line"
+            fi
+            TRACKED_LIST+=("$expanded")
         done < "$TRACKED"
     fi
 
+    ENC_LIST=()
     if [ -f "$TRACKED_ENC" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
-            for expanded in $line; do
-                if [ -e "$expanded" ]; then
-                    chezmoi add --encrypt --recursive --non-interactive "$expanded" > /dev/null 2>&1
-                fi
-            done
+            if [[ "$line" == /* ]]; then
+                expanded="$line"
+            elif [[ "$line" == ~* ]]; then
+                expanded="${line/#\~/$HOME}"
+            else
+                expanded="$HOME/$line"
+            fi
+            ENC_LIST+=("$expanded")
         done < "$TRACKED_ENC"
     fi
 
-    echo "Cleaning up orphaned and untracked files..."
+    echo "=> Discovering and tracking new files..."
 
+    # gathers all files in the home directory that chezmoi is not currently tracking
+    mapfile -t unmanaged_files < <(chezmoi unmanaged)
+
+    for rel_path in "${unmanaged_files[@]}"; do
+        full_path="$HOME/$rel_path"
+
+        # prioritizes encryption check
+        matched=0
+        for prefix in "${ENC_LIST[@]}"; do
+            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]]; then
+                echo "  -> Encrypting & Adding new file: $full_path"
+                chezmoi add --encrypt --force "$full_path"
+                matched=1
+                break
+            fi
+        done
+
+        if [ $matched -eq 1 ]; then continue; fi
+
+        # falls back to standard tracking check
+        for prefix in "${TRACKED_LIST[@]}"; do
+            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]]; then
+                echo "  -> Adding new file: $full_path"
+                chezmoi add --force "$full_path"
+                break
+            fi
+        done
+    done
+
+    echo "=> Cleaning up orphaned and untracked files..."
+
+    # builds whitelist of core configurations that must never be untracked
     VALID_PREFIXES=(
-        "$TRACKED"
-        "$TRACKED_ENC"
+        "${TRACKED_LIST[@]}"
+        "${ENC_LIST[@]}"
         "$HOME/.config/chezmoi"
         "$HOME/.config/systemd/user/dotfiles-upload.service"
         "$HOME/.config/systemd/user/dotfiles-upload.timer"
     )
 
-    for list_file in "$TRACKED" "$TRACKED_ENC"; do
-        if [ -f "$list_file" ]; then
-            while IFS= read -r line || [ -n "$line" ]; do
-                if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
-                for expanded in $line; do
-                    VALID_PREFIXES+=("$expanded")
-                done
-            done < "$list_file"
-        fi
-    done
+    # reads managed files into an array to avoid stdin pipe conflicts with chezmoi forget
+    mapfile -t managed_files < <(chezmoi managed)
 
-    chezmoi managed | while read -r tracked_path; do
+    for tracked_path in "${managed_files[@]}"; do
         full_path="$HOME/$tracked_path"
 
+        # removes file from source state if missing from home directory
         if [ ! -e "$full_path" ]; then
-            chezmoi forget "$full_path" > /dev/null 2>&1
+            echo "  -> Forgetting missing file: $full_path"
+            chezmoi forget --force "$full_path" || true
             continue
         fi
 
+        # checks if file path falls under any whitelist prefix or is a parent directory
         is_valid=0
         for prefix in "${VALID_PREFIXES[@]}"; do
-            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]]; then
+            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$prefix" == "$full_path"/* ]]; then
                 is_valid=1
                 break
             fi
         done
 
+        # untracks file if it is not in the whitelist
         if [ $is_valid -eq 0 ]; then
-            chezmoi forget "$full_path" > /dev/null 2>&1
+            echo "  -> Forgetting untracked file: $full_path"
+            chezmoi forget --force "$full_path" || true
         fi
     done
+
+    echo "=> Committing and pushing changes..."
+
+    # checks for uncommitted changes or untracked files and suppresses false error outputs
+    has_changes=0
+    chezmoi git -- diff --quiet 2>/dev/null || has_changes=1
+    chezmoi git -- diff --cached --quiet 2>/dev/null || has_changes=1
+    if [ -n "$(chezmoi git -- ls-files --others --exclude-standard)" ]; then
+        has_changes=1
+    fi
+
+    if [ "$has_changes" -eq 1 ]; then
+        echo "  -> Staging changes..."
+        chezmoi git -- add .
+
+        has_staged=0
+        chezmoi git -- diff --cached --quiet 2>/dev/null || has_staged=1
+
+        if [ "$has_staged" -eq 1 ]; then
+            echo "  -> Creating commit..."
+            chezmoi git -- commit -m "chore: auto-sync dotfiles"
+        else
+            echo "  -> No changes staged for commit."
+        fi
+
+        echo "  -> Pushing to remote..."
+        chezmoi git -- push
+    else
+        echo "  -> No new changes to commit."
+    fi
 
     echo "Sync engine finished."
 
@@ -184,12 +255,12 @@ dotfiles-add-secret *targets:
     fi
     ${EDITOR:-nvim} "{{ TRACKED_ENC_FILE }}"
 
-# bypasses tracking lists to manually add a file recursively
+# bypasses tracking lists to manually track a file recursively
 dotfiles-manual-add +targets:
     @chezmoi add --recursive {{ targets }}
     @echo "Manually added {{ targets }}."
 
-# bypasses tracking lists to manually add a sensitive file
+# bypasses tracking lists to manually track a sensitive file
 dotfiles-manual-add-secret +targets:
     @chezmoi add --encrypt --recursive {{ targets }}
     @echo "Manually added and encrypted {{ targets }}."
@@ -197,13 +268,13 @@ dotfiles-manual-add-secret +targets:
 # fetches updates from gitlab and applies them
 dotfiles-update:
     @echo "Fetching and applying updates..."
-    @chezmoi update --non-interactive > /dev/null 2>&1
+    @chezmoi update --force
     @echo "System is up to date."
 
 # applies pending local changes to the system
 dotfiles-apply:
     @echo "Applying local changes..."
-    @chezmoi apply --non-interactive > /dev/null 2>&1
+    @chezmoi apply --force
     @echo "Changes applied successfully."
 
 # opens a shell inside the dotfiles source directory
@@ -212,16 +283,8 @@ dotfiles-cd:
 
 # removes files from source state tracking
 dotfiles-forget +targets:
-    @chezmoi forget {{ targets }}
+    @chezmoi forget --force {{ targets }}
     @echo "Untracked {{ targets }}."
-
-# commits and pushes local changes to gitlab
-dotfiles-push message:
-    @echo "Pushing changes to GitLab..."
-    @chezmoi git -- add .
-    @chezmoi git -- commit -m "{{ message }}" --quiet || true
-    @chezmoi git -- push -u origin main --quiet
-    @echo "Push complete."
 
 # shows modified files pending sync
 dotfiles-status:
