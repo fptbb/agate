@@ -75,6 +75,6 @@ modules:
       enabled:
         - nordvpnd
         - tailscaled
-        # - proton-vpn-daemon
+        - me.proton.vpn.split_tunneling.service
         # - whatpulse-pcap-service
         # - opensnitch
