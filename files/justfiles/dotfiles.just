@@ -16,6 +16,20 @@ dotfiles-setup:
     set -e
     mkdir -p ~/.ssh ~/.config/chezmoi ~/.config/systemd/user
 
+    # ensures dependencies are available
+    for cmd in age chezmoi; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            if command -v brew >/dev/null 2>&1; then
+                echo "$cmd not found. installing via homebrew..."
+                brew install "$cmd"
+            else
+                echo "error: $cmd is not installed and homebrew was not found."
+                echo "please install $cmd manually to continue."
+                exit 1
+            fi
+        fi
+    done
+
     # uses existing ssh key if available
     if [ ! -f "{{ SSH_KEY_PATH }}" ]; then
         echo "Paste your SSH private key and press Ctrl+D:"
@@ -43,15 +57,15 @@ dotfiles-setup:
     # decrypts the repository key using automated prompt if variable is set
     if [ -n "{{ AGE_PASS }}" ]; then
         if command -v expect >/dev/null 2>&1; then
-            expect -c "spawn age -d -o $HOME/.config/chezmoi/key.txt $HOME/.local/share/chezmoi/age-private-key.enc; expect \"Enter passphrase:\"; send \"{{ AGE_PASS }}\r\"; expect eof"
+            expect -c "spawn age -d -o $HOME/.config/chezmoi/age-private-key.txt $HOME/.local/share/chezmoi/age-private-key.enc; expect \"Enter passphrase:\"; send \"{{ AGE_PASS }}\r\"; expect eof"
         else
             echo "warning: expect is required for non-interactive decryption. falling back to interactive prompt."
-            age -d -o ~/.config/chezmoi/key.txt ~/.local/share/chezmoi/age-private-key.enc
+            age -d -o ~/.config/chezmoi/age-private-key.txt ~/.local/share/chezmoi/age-private-key.enc
         fi
     else
-        age -d -o ~/.config/chezmoi/key.txt ~/.local/share/chezmoi/age-private-key.enc
+        age -d -o ~/.config/chezmoi/age-private-key.txt ~/.local/share/chezmoi/age-private-key.enc
     fi
-    chmod 600 ~/.config/chezmoi/key.txt
+    chmod 600 ~/.config/chezmoi/age-private-key.txt
 
     chezmoi apply --force
 
