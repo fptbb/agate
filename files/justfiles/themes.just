@@ -24,9 +24,9 @@ agate-install-catppuccin:
     cd "$TMP_DIR/catppuccin-kde"
 
     # answers yes to installation and no to applying the theme
-    printf "y\nn\n" | ./install.sh 3 12 1
-    printf "y\nn\n" | ./install.sh 4 12 1
-    printf "y\nn\n" | ./install.sh 1 12 1
+    printf "y\nn\n" | ./install.sh 3 12 2
+    printf "y\nn\n" | ./install.sh 4 12 2
+    printf "y\nn\n" | ./install.sh 1 12 2
 
 # installs kora icons
 agate-install-kora:
@@ -39,18 +39,31 @@ agate-install-kora:
     # removes existing kora icons
     rm -rf ~/.local/share/icons/kora*
 
-    echo "Installing Kora icons..."
-    git clone https://github.com/bikass/kora.git "$TMP_DIR/kora"
+    echo "Fetching latest Kora release metadata..."
+    # gets the tarball url from the latest release via github api
+    TARBALL_URL=$(curl -s https://api.github.com/repos/bikass/kora/releases/latest | grep "tarball_url" | cut -d '"' -f 4)
+
+    if [ -z "$TARBALL_URL" ]; then
+        echo "Error: Could not find latest release URL."
+        exit 1
+    fi
+
+    echo "Downloading and extracting Kora icons..."
+    mkdir -p "$TMP_DIR/kora"
+    # extracts directly into the temp folder, stripping the root archive directory
+    curl -L "$TARBALL_URL" | tar -xz -C "$TMP_DIR/kora" --strip-components=1
+
     mkdir -p ~/.local/share/icons
     cp -r "$TMP_DIR"/kora/kora* ~/.local/share/icons/
 
     echo "Updating icon cache..."
-    # updates cache only for installed kora directories
     for dir in ~/.local/share/icons/kora*/; do
         if [ -d "$dir" ]; then
             gtk-update-icon-cache -q -f -t "$dir" || true
         fi
     done
+
+    echo "Installation complete."
 
 # installs plasmusic toolbar
 agate-install-plasmusic:
