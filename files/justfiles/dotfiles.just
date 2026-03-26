@@ -38,6 +38,7 @@ dotfiles-setup:
     chezmoi git -- config gpg.format ssh
     chezmoi git -- config user.signingkey "{{ SSH_KEY_PATH }}.pub"
     chezmoi git -- config commit.gpgsign true
+    chezmoi git -- config push.autoSetupRemote true
 
     # decrypts the repository key using automated prompt if variable is set
     if [ -n "{{ AGE_PASS }}" ]; then
@@ -231,7 +232,8 @@ dotfiles-sync:
         fi
 
         echo "  -> Pushing to remote..."
-        chezmoi git -- push
+        # uses HEAD to automatically set upstream if it is missing
+        chezmoi git -- push -u origin HEAD
     else
         echo "  -> No new changes to commit."
     fi
@@ -316,20 +318,28 @@ dotfiles-clean-history:
     #!/usr/bin/env bash
     set -e
 
-    # prompts for initial destructive action confirmation
+    # prompts for initial destructive action confirmation with 15s timeout
     echo "Warning: This action will permanently delete all previous commit history."
-    read -p "Are you sure you want to proceed? [y/N] " CONFIRM1
+    if ! read -t 15 -p "Are you sure you want to proceed? [y/N] " CONFIRM1; then
+        echo -e "\nPrompt timed out. Operation cancelled."
+        exit 0
+    fi
+
     if [[ ! "$CONFIRM1" =~ ^[Yy]$ ]]; then
         echo "Operation cancelled."
         exit 0
     fi
 
-    # prompts for branch protection confirmation
+    # prompts for branch protection confirmation with 15s timeout
     echo ""
     echo "Warning: The force push will fail if your remote branch is protected."
     echo "Please verify branch protection is disabled here:"
     echo "https://gitlab.com/{{ REPO_PATH }}/-/settings/repository#js-protected-branches-settings"
-    read -p "Have you disabled protection for your current branch? [y/N] " CONFIRM2
+    if ! read -t 15 -p "Have you disabled protection for your current branch? [y/N] " CONFIRM2; then
+        echo -e "\nPrompt timed out. Operation cancelled."
+        exit 0
+    fi
+
     if [[ ! "$CONFIRM2" =~ ^[Yy]$ ]]; then
         echo "Operation cancelled. Please disable branch protection and try again."
         exit 0
@@ -354,7 +364,7 @@ dotfiles-clean-history:
 
     # forces the remote to accept the overwritten history
     echo "Force pushing to remote..."
-    chezmoi git -- push -f origin "$BRANCH"
+    chezmoi git -- push -f -u origin "$BRANCH"
 
     # runs aggressive garbage collection to free local space
     echo "Cleaning local garbage..."

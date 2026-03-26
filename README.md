@@ -9,40 +9,41 @@
 
 ---
 
-## Introduction
+## Overview
 
-Welcome to Agate! This project is a customized, bootable OS image based on [Bazzite](https://bazzite.gg/) (a Fedora KDE variant), built using [BlueBuild](https://blue-build.org/).
+Agate is a Fedora Bazzite-based atomic image built with [BlueBuild](https://blue-build.org/). It is my personal daily driver, tuned for my workflow, branding, and app setup.
 
-While this is my personal daily driver OS, tailored to my specific workflow and preferences, it is publicly available as a learning resource or a starting point for your own custom OS. You can see how specific customizations are layered onto Bazzite, fork the project to suit your needs, or draw inspiration for your own immutable builds.
+**Warning:** this image is for personal use. The source is shared for reference only, and some customizations may not fit your setup.
 
-**Disclaimer:** This project includes personal branding and specific configurations that may not be suitable for everyone. Review the customizations carefully before adopting.
+## What It Does
 
-## Core Concept
+*   Starts from `ghcr.io/ublue-os/bazzite-dx-nvidia:latest`.
+*   Keeps the system atomic and rollback-friendly.
+*   Adds personal branding, wallpapers, icons, cursors, and KDE tweaks.
+*   Enables services and tools I use often, including `nordvpnd`, `tailscaled`, `netbird`, `podman.socket`, `opensnitch`, and `whatpulse`.
+*   Uses extra COPR repos for tools like `yadm`, `VeraCrypt`, and `linuxtoys`.
+*   Ships with a curated set of RPMs and Flatpaks for development, gaming, media, and day-to-day work.
+*   Includes helper scripts for dotfiles, theming, development setup, YubiKey/LUKS setup, and Spotify Spicetify management.
 
-*   **Base Image:** `ghcr.io/ublue-os/bazzite-dx-nvidia:latest`. This provides a solid foundation of Fedora Kinoite (KDE Plasma) with Bazzite's gaming enhancements, developer tools, and pre-installed Nvidia drivers.
-*   **Immutable & Atomic:** Leveraging `bootc` and `ostree`, the system is reliable, predictable, and robust. Updates are atomic, and you can easily roll back to previous states.
-*   **Customized Layering:** The base image is augmented with personal branding, additional development packages, custom copr repos, and an expansive set of pre-installed Flatpaks.
-*   **Flatpak-Centric:** Most user-facing applications are installed as Flatpaks at build-time.
+## Justfile
 
-## Features & Customizations
+The root `Justfile` provides the main build commands:
 
-### System-Level Changes & Additions
-*   **Google Account Fix:** The KDE Google Account provider is modified to improve Google Drive integration.
-*   **Enabled Services:** The following services are enabled by default: `nordvpnd`, `tailscaled`, `netbird`, and `podman.socket`.
-*   **Disabled Services:** `NetworkManager-wait-online.service` is disabled to speed up boot times.
-*   **Nix Pkgs Manager:** Nix Pkgs are ready to be installed using `just agate-nixpkgs`.
-*   **Enabled Services:** Hardened networking and tracking via `whatpulse`, and `opensnitch` application firewall natively enabled out of the box.
-*   **Copr Repositories:** Leverages external coprs for tools like `yadm`, `VeraCrypt`, and `linuxtoys`.
+*   `just build` - build the image.
+*   `just build-iso` - build a local bootable ISO.
+*   `just build-iso-online` - build an ISO from the published image.
+*   `just generate` - generate a `Containerfile`.
+*   `just validate` - validate the BlueBuild recipe.
+*   `just prune` - prune BlueBuild artifacts.
 
-### Included RPM Packages
-In addition to the standard Bazzite offering, Agate directly layers on heavy development, packaging, and debugging tools, for things like development, networking (mostly dependencies for opensnitch and whatpulse), utilities, and integrations.
+The helper `files/justfiles/*.just` files add system-specific tasks:
 
-### Pre-Installed System Flatpaks
-Agate ships with a curated selection of default applications installed directly to the system space, including:
-*   **Web & Comm:** Zen Browser (`app.zen_browser.zen`), Thunderbird, Discord/Vesktop alternative clients.
-*   **Gaming:** Ryujinx, PrismLauncher, MCPE Launcher, Sober, Vinegar, Heroic Games Launcher, Bottles.
-*   **Development & Setup:** Podman Desktop, QtCreator, Insomnia, Gitnuro, Obsidian.
-*   **Media & Production:** OBS Studio, GIMP, Audacity, Spotify.
+*   `dotfiles-*` - bootstrap, sync, apply, inspect, and clean dotfiles.
+*   `agate-nixpkgs` and `agate-devbox` - install Nix and Devbox.
+*   `agate-manage-themes` - install Catppuccin, Kora, and PlasMusic.
+*   `agate-spicetify` - patch Spotify and install Spicetify Marketplace.
+*   `agate-luks-setup` and `agate-luks-remove` - manage YubiKey-backed LUKS.
+*   `agate-kde-setup` - configure KDE YubiKey authentication.
 
 ## How to Use
 
@@ -60,7 +61,7 @@ After the command completes, reboot your system. You can check the status at any
 
 ## Building from Source
 
-To customize this image or build it yourself locally, you can use the provided `Justfile`.
+To customize this image or build it yourself locally, use the provided `Justfile`.
 
 ### Prerequisites
 *   A container runtime like [Podman](https://podman.io/).
