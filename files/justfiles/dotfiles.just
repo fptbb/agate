@@ -7,8 +7,10 @@ BOOTSTRAP_DIR := env_var_or_default("DOTFILES_BOOTSTRAP_DIR", HOME_DIR + "/.bin/
 SSH_KEY_PATH := env_var_or_default("DOTFILES_SSH_KEY", HOME_DIR + "/.ssh/ssh_gitlab")
 SKIP_BOOTSTRAP := env_var_or_default("SKIP_BOOTSTRAP", "0")
 AGE_PASS := env_var_or_default("DOTFILES_AGE_PASS", "")
+REPO_PATH := env_var_or_default("DOTFILES_REPO_PATH", "fptbb/dotfiles")
+REPO_URL := env_var_or_default("DOTFILES_REPO_URL", "git@gitlab.com:" + REPO_PATH + ".git")
 
-# bootstraps dotfiles from private gitlab repository
+# bootstraps dotfiles from private repository
 dotfiles-setup:
     #!/usr/bin/env bash
     set -e
@@ -16,7 +18,7 @@ dotfiles-setup:
 
     # uses existing ssh key if available
     if [ ! -f "{{ SSH_KEY_PATH }}" ]; then
-        echo "Paste your GitLab SSH private key and press Ctrl+D:"
+        echo "Paste your SSH private key and press Ctrl+D:"
         cat > "{{ SSH_KEY_PATH }}"
         chmod 600 "{{ SSH_KEY_PATH }}"
     else
@@ -24,9 +26,12 @@ dotfiles-setup:
     fi
 
     ssh-keygen -y -f "{{ SSH_KEY_PATH }}" > "{{ SSH_KEY_PATH }}.pub"
-    ssh-keyscan gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
 
-    GIT_SSH_COMMAND="ssh -i {{ SSH_KEY_PATH }} -o IdentitiesOnly=yes" chezmoi init git@gitlab.com:fptbb/dotfiles.git
+    # extracts domain from repo url to scan host keys
+    DOMAIN=$(echo "{{ REPO_URL }}" | sed -e 's/.*@//' -e 's/:.*//')
+    ssh-keyscan "$DOMAIN" >> ~/.ssh/known_hosts 2>/dev/null
+
+    GIT_SSH_COMMAND="ssh -i {{ SSH_KEY_PATH }} -o IdentitiesOnly=yes" chezmoi init {{ REPO_URL }}
 
     # isolates git repository config
     chezmoi git -- config core.sshCommand "ssh -i {{ SSH_KEY_PATH }} -o IdentitiesOnly=yes"
@@ -265,7 +270,7 @@ dotfiles-manual-add-secret +targets:
     @chezmoi add --encrypt --recursive {{ targets }}
     @echo "Manually added and encrypted {{ targets }}."
 
-# fetches updates from gitlab and applies them
+# fetches updates from remote and applies them
 dotfiles-update:
     @echo "Fetching and applying updates..."
     @chezmoi update --force
@@ -305,3 +310,55 @@ dotfiles-logs:
 # opens both tracking lists in neovim simultaneously
 dotfiles-edit-lists:
     @${EDITOR:-nvim} -p {{ TRACKED_FILE }} {{ TRACKED_ENC_FILE }}
+
+# resets the git repository history to a single commit to save space
+dotfiles-clean-history:
+    #!/usr/bin/env bash
+    set -e
+
+    # prompts for initial destructive action confirmation
+    echo "Warning: This action will permanently delete all previous commit history."
+    read -p "Are you sure you want to proceed? [y/N] " CONFIRM1
+    if [[ ! "$CONFIRM1" =~ ^[Yy]$ ]]; then
+        echo "Operation cancelled."
+        exit 0
+    fi
+
+    # prompts for branch protection confirmation
+    echo ""
+    echo "Warning: The force push will fail if your remote branch is protected."
+    echo "Please verify branch protection is disabled here:"
+    echo "https://gitlab.com/{{ REPO_PATH }}/-/settings/repository#js-protected-branches-settings"
+    read -p "Have you disabled protection for your current branch? [y/N] " CONFIRM2
+    if [[ ! "$CONFIRM2" =~ ^[Yy]$ ]]; then
+        echo "Operation cancelled. Please disable branch protection and try again."
+        exit 0
+    fi
+
+    echo "Resetting repository history..."
+
+    # gets the current branch name
+    BRANCH=$(chezmoi git -- branch --show-current)
+    if [ -z "$BRANCH" ]; then
+        BRANCH="main"
+    fi
+
+    # creates a new detached history state
+    chezmoi git -- checkout --orphan temp_branch
+    chezmoi git -- add -A
+    chezmoi git -- commit -m "chore: reset repository history"
+
+    # replaces the old branch with the new one
+    chezmoi git -- branch -D "$BRANCH"
+    chezmoi git -- branch -m "$BRANCH"
+
+    # forces the remote to accept the overwritten history
+    echo "Force pushing to remote..."
+    chezmoi git -- push -f origin "$BRANCH"
+
+    # runs aggressive garbage collection to free local space
+    echo "Cleaning local garbage..."
+    chezmoi git -- reflog expire --expire=now --all
+    chezmoi git -- gc --prune=now --aggressive
+
+    echo "History cleaned successfully."
