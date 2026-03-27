@@ -57,15 +57,15 @@ dotfiles-setup:
     # decrypts the repository key using automated prompt if variable is set
     if [ -n "{{ AGE_PASS }}" ]; then
         if command -v expect >/dev/null 2>&1; then
-            expect -c "spawn age -d -o $HOME/.config/chezmoi/age-private-key.txt $HOME/.local/share/chezmoi/age-private-key.enc; expect \"Enter passphrase:\"; send \"{{ AGE_PASS }}\r\"; expect eof"
+            expect -c "spawn age -d -o $HOME/.config/chezmoi/.age-private-key.txt $HOME/.bin/.age-private-key.enc; expect \"Enter passphrase:\"; send \"{{ AGE_PASS }}\r\"; expect eof"
         else
             echo "warning: expect is required for non-interactive decryption. falling back to interactive prompt."
-            age -d -o ~/.config/chezmoi/age-private-key.txt ~/.local/share/chezmoi/age-private-key.enc
+            age -d -o ~/.config/chezmoi/.age-private-key.txt ~/.bin/.age-private-key.enc
         fi
     else
-        age -d -o ~/.config/chezmoi/age-private-key.txt ~/.local/share/chezmoi/age-private-key.enc
+        age -d -o ~/.config/chezmoi/.age-private-key.txt ~/.bin/.age-private-key.enc
     fi
-    chmod 600 ~/.config/chezmoi/age-private-key.txt
+    chmod 600 ~/.config/chezmoi/.age-private-key.txt
 
     chezmoi apply --force
 
