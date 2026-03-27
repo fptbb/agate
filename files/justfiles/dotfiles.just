@@ -32,9 +32,19 @@ dotfiles-setup:
 
     # uses existing ssh key if available
     if [ ! -f "{{ SSH_KEY_PATH }}" ]; then
-        echo "Paste your SSH private key and press Ctrl+D:"
-        cat > "{{ SSH_KEY_PATH }}"
+        echo "Paste your SSH private key (input is hidden). Press Enter, then Ctrl+D when finished:"
+
+        # creates or clears the file
+        : > "{{ SSH_KEY_PATH }}"
         chmod 600 "{{ SSH_KEY_PATH }}"
+
+        # reads input character by character or line by line silently
+        while IFS= read -r -s line; do
+            echo "$line" >> "{{ SSH_KEY_PATH }}"
+        done
+
+        # adds a final newline if the file is empty or formatted oddly
+        echo "" >> "{{ SSH_KEY_PATH }}"
     else
         echo "Using existing SSH key at {{ SSH_KEY_PATH }}"
     fi
