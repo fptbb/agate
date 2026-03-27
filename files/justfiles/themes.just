@@ -8,10 +8,8 @@ agate-install-catppuccin:
     set -e
 
     TMP_DIR=$(mktemp -d)
-    # fallback cleanup on failure
     trap 'rm -rf "$TMP_DIR"' EXIT
 
-    # cleans up existing theme files to allow fresh installation and avoid directory conflicts
     rm -rf ~/.local/share/plasma/look-and-feel/Catppuccin-*
     rm -rf ~/.local/share/plasma/desktoptheme/Catppuccin-*
     rm -rf ~/.local/share/aurorae/themes/Catppuccin-*
@@ -27,13 +25,11 @@ agate-install-catppuccin:
         local theme_name="$1"
         shift
         echo -n "Installing $theme_name... "
-        # Run the prompt inputs and hide the installer's verbose output and clear commands
         if env TERM=dumb printf "y\nn\n" | ./install.sh "$@" > "$TMP_DIR/install.log" 2>&1; then
             echo "OK"
         else
             echo "FAILED"
             echo "--- error log ---"
-            # Extract printable characters to avoid applying any raw escape sequences (like clear console)
             cat -v "$TMP_DIR/install.log"
             exit 1
         fi
@@ -51,11 +47,9 @@ agate-install-kora:
     TMP_DIR=$(mktemp -d)
     trap 'rm -rf "$TMP_DIR"' EXIT
 
-    # removes existing kora icons
     rm -rf ~/.local/share/icons/kora*
 
     echo -n "Fetching latest Kora release metadata... "
-    # gets the tarball url from the latest release via github api
     TARBALL_URL=$(curl -s https://api.github.com/repos/bikass/kora/releases/latest | grep "tarball_url" | cut -d '"' -f 4)
 
     if [ -z "$TARBALL_URL" ]; then
@@ -111,7 +105,6 @@ agate-install-plasmusic:
     fi
 
     echo -n "Installing PlasMusic Toolbar... "
-    # removes existing installation to avoid conflict errors
     kpackagetool6 -t Plasma/Applet -r plasmusic-toolbar >/dev/null 2>&1 || true
     if kpackagetool6 -t Plasma/Applet -i "$TMP_DIR/plasmusic-toolbar/src" >"$TMP_DIR/plasmusic_pkg.log" 2>&1; then
         echo "OK"
