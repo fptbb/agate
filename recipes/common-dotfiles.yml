@@ -4,7 +4,7 @@
 modules:
   - type: chezmoi
     repository: "git@gitlab.com:fptbb/dotfiles.git"
-    file-conflict-policy: replace
+    file-conflict-policy: skip
     disable-init: true
     run-every: '4h'
   - type: justfiles
