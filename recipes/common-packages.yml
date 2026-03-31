@@ -5,7 +5,6 @@ modules:
     repos:
       cleanup: true
       copr:
-        - jloehel/yadm
         - bigjapka/VeraCrypt
         - fptbb/fp-appimage-updater
       files:
@@ -21,48 +20,45 @@ modules:
       skip-unavailable: true
       skip-broken: true
       packages:
-        - nordvpn
-        - tailscale
-        - yadm
-        - veracrypt
-        - cloudflare-warp
-        - fp-appimage-updater # declarative appimage updater
-        - iproute # networking utilities like ip addr and ip route
+        # Networking & VPNs
+        - nordvpn # nordvpn's cli client for linux
+        - tailscale # a zero-config vpn and private network tool
+        - cloudflare-warp # cloudflare's vpn and dns resolver client
         - libpcap # packet capture library for network sniffing tools
-        - libpcap-devel # libraries and header files for the libpcap library
-        - netcat # tcp/udp swiss-army knife for networking
-        - nmap-ncat # alternative netcat implementation (comes with nmap)
-        - dialog # show text-based ui dialogs in shell scripts
-        - libnotify # send desktop notifications from scripts and apps
-        - inxi # a full featured system information script
-        - bash-completion # enables tab-completion for many cli tools
-        - buildah # build oci/docker images without needing a daemon
-        - code # visual studio code ide for development
-        - copr-cli # manage fedora copr repositories from the command line
-        - coreos-installer # tool to install fedora coreos systems
-        - gameconqueror # cheat engine for linux (debug and memory edit)
-        - kde-partitionmanager # gui tool to manage disk partitions
-        - gnome-disk-utility # gui for disk management
+
+        # System Utilities & CLI Enhancement
         - kitty # extremely fast, gpu-accelerated terminal emulator
         - powerline-fonts # patched fonts with powerline symbols
-        - rpm-build # tools to build rpm packages
-        - rpmdevtools # developer tools for rpm packaging
-        - tinygo # small go compiler for microcontrollers and webassembly
-        - upx # ultimate packer for executables (binary compressor)
-        - yt-dlp # powerful video downloader with youtube support
-        - p7zip # very high compression ratio file archiver
-        - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images
-        - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension
-        - megatools # access mega.nz cloud storage from cli
-        - wine # a compatibility layer for windows applications
-        - winetricks # work around common problems in wine
-        - dotnet-sdk-8.0 # .net 8.0 software development kit
+
+        # Security & Authentication
         - pam-u2f # yubikey and fido u2f authentication for pam
         - libfido2 # fido2 library for u2f support in browsers and other applications
         - fido2-tools # command line tools for fido2 devices
         - gnupg2 # openpgp encryption and signing tools
-        - kleopatra # certificate and key management tool
+        - veracrypt # disk encryption software based on truecrypt
         - fuse-encfs # encrypted filesystem support via fuse
+
+        # Development & Image Management
+        - buildah # build oci/docker images without needing a daemon
+        - copr-cli # manage fedora copr repositories from the command line
+        - coreos-installer # tool to install fedora coreos systems
+        - fp-appimage-updater # declarative appimage updater
+        - upx # ultimate packer for executables (binary compressor)
+
+        # Storage & File Management
+        - kde-partitionmanager # gui tool to manage disk partitions
+        - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images
+        - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension
+        - megatools # access mega.nz cloud storage from cli
+
+        # Windows Compatibility & Gaming
+        - wine # a compatibility layer for windows applications
+        - winetricks # work around common problems in wine
+        - gameconqueror # cheat engine for linux (debug and memory edit)
+
+        # Dotfiles, Automation & Secrets
+        - chezmoi # manage your dotfiles across multiple machines
+        - age # simple, modern and secure file encryption tool
         - expect # automate interactive applications with scripts
   - type: script
     scripts:
