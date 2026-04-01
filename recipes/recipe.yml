@@ -18,6 +18,7 @@ modules:
   - from-file: common-development.yml
   - from-file: common-dotfiles.yml
   - from-file: common-branding.yml
+  - from-file: common-windowmanager.yml
 
   - type: signing
 labels:
