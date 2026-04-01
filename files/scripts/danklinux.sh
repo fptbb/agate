@@ -3,6 +3,7 @@ set -ouex pipefail
 
 echo "Configuring DankLinux (DMS) for Niri Wayland Session..."
 
-# Link the user service to start when niri starts
+# Link the user services to start when niri starts
 mkdir -p /usr/lib/systemd/user/niri.service.wants
 ln -sf /usr/lib/systemd/user/dms.service /usr/lib/systemd/user/niri.service.wants/dms.service
+ln -sf /usr/lib/systemd/user/dsearch.service /usr/lib/systemd/user/niri.service.wants/dsearch.service
