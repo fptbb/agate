@@ -15,11 +15,16 @@ modules:
         - dgop
         - dsearch
         - matugen
+
+        # System related just to make sure
         - qt6-qtmultimedia
         - cups-pk-helper
         - kf6-kwallet
         - pam-kwallet
         - kwalletmanager
+        - qt5ct
+        - qt6ct
+        - kvantum
   - type: script
     scripts:
       - danklinux.sh
