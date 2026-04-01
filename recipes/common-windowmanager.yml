@@ -16,7 +16,7 @@ modules:
         - dsearch
         - matugen
         - qt6-qtmultimedia
-
+        - cups-pk-helper
   - type: script
     scripts:
       - danklinux.sh
