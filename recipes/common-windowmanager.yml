@@ -17,6 +17,9 @@ modules:
         - matugen
         - qt6-qtmultimedia
         - cups-pk-helper
+        - kf6-kwallet
+        - pam-kwallet
+        - kwalletmanager
   - type: script
     scripts:
       - danklinux.sh
