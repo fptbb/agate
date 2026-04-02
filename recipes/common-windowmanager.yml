@@ -25,6 +25,8 @@ modules:
         - qt5ct
         - qt6ct
         - kvantum
+        - xdg-desktop-portal-gtk
+        - xdg-desktop-portal-wlr
   - type: script
     scripts:
       - danklinux.sh
