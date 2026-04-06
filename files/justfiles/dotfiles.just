@@ -31,7 +31,7 @@ dotfiles-setup:
     done
 
     # uses existing ssh key if available
-    if [ ! -f "{{ SSH_KEY_PATH }}" ]; then
+    if [ ! -f "{{ SSH_KEY_PATH }}" ]; thenshopt
         echo "Paste your SSH private key (input is hidden). Press Enter, then Ctrl+D when finished:"
 
         # creates or clears the file
@@ -188,41 +188,46 @@ dotfiles-sync:
 
     echo "=> Discovering and tracking new files..."
 
-    # gathers all files in the home directory that chezmoi is not currently tracking
-    mapfile -t unmanaged_files < <(chezmoi unmanaged)
+    # enables bash wildcard expansion for hidden files and prevents looping if no match exists
+    shopt -s nullglob dotglob extglob
 
-    for rel_path in "${unmanaged_files[@]}"; do
-        full_path="$HOME/$rel_path"
+    for pattern in "${ENC_LIST[@]}"; do
+        for target in $pattern; do
+            if [ -e "$target" ]; then
+                is_ignored=0
+                for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
+                    if [[ "$target" == "$ex" ]] || [[ "$target" == "$ex"/* ]] || [[ "$target" =~ $ex ]]; then
+                        is_ignored=1
+                        break
+                    fi
+                done
+                if [ $is_ignored -eq 1 ]; then continue; fi
 
-        # skips path if it matches any exclusion pattern
-        is_ignored=0
-        for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-            if [[ "$full_path" == "$ex" ]] || [[ "$full_path" == "$ex"/* ]] || [[ "$full_path" =~ $ex ]]; then
-                is_ignored=1
-                break
+                # only checks chezmoi status if a file resolves to avoid duplicate operations
+                if ! chezmoi managed "$target" > /dev/null 2>&1; then
+                    echo "  -> Encrypting & Adding new file: $target"
+                    chezmoi add --encrypt --force "$target"
+                fi
             fi
         done
-        if [ $is_ignored -eq 1 ]; then continue; fi
+    done
 
-        # prioritizes encryption check with regex support
-        matched=0
-        for prefix in "${ENC_LIST[@]}"; do
-            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$full_path" =~ $prefix ]]; then
-                echo "  -> Encrypting & Adding new file: $full_path"
-                chezmoi add --encrypt --force "$full_path"
-                matched=1
-                break
-            fi
-        done
+    for pattern in "${TRACKED_LIST[@]}"; do
+        for target in $pattern; do
+            if [ -e "$target" ]; then
+                is_ignored=0
+                for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
+                    if [[ "$target" == "$ex" ]] || [[ "$target" == "$ex"/* ]] || [[ "$target" =~ $ex ]]; then
+                        is_ignored=1
+                        break
+                    fi
+                done
+                if [ $is_ignored -eq 1 ]; then continue; fi
 
-        if [ $matched -eq 1 ]; then continue; fi
-
-        # falls back to standard tracking check with regex support
-        for prefix in "${TRACKED_LIST[@]}"; do
-            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$full_path" =~ $prefix ]]; then
-                echo "  -> Adding new file: $full_path"
-                chezmoi add --force "$full_path"
-                break
+                if ! chezmoi managed "$target" > /dev/null 2>&1; then
+                    echo "  -> Adding new file: $target"
+                    chezmoi add --force "$target"
+                fi
             fi
         done
     done
