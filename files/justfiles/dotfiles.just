@@ -135,7 +135,7 @@ dotfiles-sync:
     if [ -f "$TRACKED" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
-            
+
             is_exclude=0
             if [[ "$line" == !* ]]; then
                 is_exclude=1
@@ -149,7 +149,7 @@ dotfiles-sync:
             else
                 expanded="$HOME/$line"
             fi
-            
+
             if [ $is_exclude -eq 1 ]; then
                 EXCLUDE_LIST+=("$expanded")
             else
@@ -177,7 +177,7 @@ dotfiles-sync:
             else
                 expanded="$HOME/$line"
             fi
-            
+
             if [ $is_exclude -eq 1 ]; then
                 ENC_EXCLUDE_LIST+=("$expanded")
             else
