@@ -129,11 +129,19 @@ dotfiles-sync:
     echo "=> Running chezmoi re-add..."
     chezmoi re-add --force
 
-    # reads tracking lists into arrays directly supporting spaces in paths
+    # reads tracking lists into arrays and separates exclusion patterns
     TRACKED_LIST=()
+    EXCLUDE_LIST=()
     if [ -f "$TRACKED" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
+            
+            is_exclude=0
+            if [[ "$line" == !* ]]; then
+                is_exclude=1
+                line="${line#!}"
+            fi
+
             if [[ "$line" == /* ]]; then
                 expanded="$line"
             elif [[ "$line" == ~* ]]; then
@@ -141,14 +149,27 @@ dotfiles-sync:
             else
                 expanded="$HOME/$line"
             fi
-            TRACKED_LIST+=("$expanded")
+            
+            if [ $is_exclude -eq 1 ]; then
+                EXCLUDE_LIST+=("$expanded")
+            else
+                TRACKED_LIST+=("$expanded")
+            fi
         done < "$TRACKED"
     fi
 
     ENC_LIST=()
+    ENC_EXCLUDE_LIST=()
     if [ -f "$TRACKED_ENC" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
             if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
+
+            is_exclude=0
+            if [[ "$line" == !* ]]; then
+                is_exclude=1
+                line="${line#!}"
+            fi
+
             if [[ "$line" == /* ]]; then
                 expanded="$line"
             elif [[ "$line" == ~* ]]; then
@@ -156,7 +177,12 @@ dotfiles-sync:
             else
                 expanded="$HOME/$line"
             fi
-            ENC_LIST+=("$expanded")
+            
+            if [ $is_exclude -eq 1 ]; then
+                ENC_EXCLUDE_LIST+=("$expanded")
+            else
+                ENC_LIST+=("$expanded")
+            fi
         done < "$TRACKED_ENC"
     fi
 
@@ -168,10 +194,20 @@ dotfiles-sync:
     for rel_path in "${unmanaged_files[@]}"; do
         full_path="$HOME/$rel_path"
 
-        # prioritizes encryption check
+        # skips path if it matches any exclusion pattern
+        is_ignored=0
+        for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
+            if [[ "$full_path" == "$ex" ]] || [[ "$full_path" == "$ex"/* ]] || [[ "$full_path" =~ $ex ]]; then
+                is_ignored=1
+                break
+            fi
+        done
+        if [ $is_ignored -eq 1 ]; then continue; fi
+
+        # prioritizes encryption check with regex support
         matched=0
         for prefix in "${ENC_LIST[@]}"; do
-            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]]; then
+            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$full_path" =~ $prefix ]]; then
                 echo "  -> Encrypting & Adding new file: $full_path"
                 chezmoi add --encrypt --force "$full_path"
                 matched=1
@@ -181,9 +217,9 @@ dotfiles-sync:
 
         if [ $matched -eq 1 ]; then continue; fi
 
-        # falls back to standard tracking check
+        # falls back to standard tracking check with regex support
         for prefix in "${TRACKED_LIST[@]}"; do
-            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]]; then
+            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$full_path" =~ $prefix ]]; then
                 echo "  -> Adding new file: $full_path"
                 chezmoi add --force "$full_path"
                 break
@@ -215,16 +251,27 @@ dotfiles-sync:
             continue
         fi
 
-        # checks if file path falls under any whitelist prefix or is a parent directory
-        is_valid=0
-        for prefix in "${VALID_PREFIXES[@]}"; do
-            if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$prefix" == "$full_path"/* ]]; then
-                is_valid=1
+        # checks if file matches exclusion patterns
+        is_ignored=0
+        for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
+            if [[ "$full_path" == "$ex" ]] || [[ "$full_path" == "$ex"/* ]] || [[ "$full_path" =~ $ex ]]; then
+                is_ignored=1
                 break
             fi
         done
 
-        # untracks file if it is not in the whitelist
+        is_valid=0
+        if [ $is_ignored -eq 0 ]; then
+            # checks if file path falls under any whitelist prefix, is a parent directory, or matches regex
+            for prefix in "${VALID_PREFIXES[@]}"; do
+                if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$prefix" == "$full_path"/* ]] || [[ "$full_path" =~ $prefix ]]; then
+                    is_valid=1
+                    break
+                fi
+            done
+        fi
+
+        # untracks file if it is not in the whitelist or matches an exclusion
         if [ $is_valid -eq 0 ]; then
             echo "  -> Forgetting untracked file: $full_path"
             chezmoi forget --force "$full_path" || true
@@ -269,9 +316,16 @@ dotfiles-add *targets:
     #!/usr/bin/env bash
     if [ -n "{{ targets }}" ]; then
         for target in {{ targets }}; do
-            realpath "$target" >> "{{ TRACKED_FILE }}"
+            abs_path=$(realpath "$target")
+            # restricts additions to files inside the home directory
+            if [[ "$abs_path" == "$HOME/"* ]]; then
+                rel_path="${abs_path#$HOME/}"
+                echo "$rel_path" >> "{{ TRACKED_FILE }}"
+                echo "Added $rel_path to {{ TRACKED_FILE }}"
+            else
+                echo "Skipping '$target': path must be inside your home directory."
+            fi
         done
-        echo "Added target(s) to {{ TRACKED_FILE }}"
     fi
     ${EDITOR:-nvim} "{{ TRACKED_FILE }}"
 
@@ -280,9 +334,16 @@ dotfiles-add-secret *targets:
     #!/usr/bin/env bash
     if [ -n "{{ targets }}" ]; then
         for target in {{ targets }}; do
-            realpath "$target" >> "{{ TRACKED_ENC_FILE }}"
+            abs_path=$(realpath "$target")
+            # restricts additions to files inside the home directory
+            if [[ "$abs_path" == "$HOME/"* ]]; then
+                rel_path="${abs_path#$HOME/}"
+                echo "$rel_path" >> "{{ TRACKED_ENC_FILE }}"
+                echo "Added secret $rel_path to {{ TRACKED_ENC_FILE }}"
+            else
+                echo "Skipping '$target': path must be inside your home directory."
+            fi
         done
-        echo "Added secret(s) to {{ TRACKED_ENC_FILE }}"
     fi
     ${EDITOR:-nvim} "{{ TRACKED_ENC_FILE }}"
 

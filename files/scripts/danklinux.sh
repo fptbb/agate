@@ -14,7 +14,9 @@ ln -sf /usr/lib/systemd/user/plasma-kwallet-pam.service /usr/lib/systemd/user/ni
 mkdir -p /usr/share/xdg-desktop-portal
 cat << 'EOF' > /usr/share/xdg-desktop-portal/niri-portals.conf
 [preferred]
-default=kde;gtk;wlr
+default=kde;gtk;
+org.freedesktop.impl.portal.ScreenCast=gnome;
+org.freedesktop.impl.portal.Screenshot=gnome;
 org.freedesktop.impl.portal.Access=kde;gtk;
 org.freedesktop.impl.portal.Notification=kde;gtk;
 org.freedesktop.impl.portal.Secret=kde;
@@ -32,7 +34,11 @@ export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 
 dbus-update-activation-environment --systemd XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION
 
-exec niri-session
+niri-session
+
+# Clean up D-Bus activation environment to guarantee zero interference with Plasma
+systemctl --user unset-environment XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION
+dbus-update-activation-environment --systemd XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORMTHEME=kde QT_WAYLAND_DISABLE_WINDOWDECORATION=
 EOF
 
 # ensures the wrapper is executable
