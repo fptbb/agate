@@ -31,7 +31,7 @@ dotfiles-setup:
     done
 
     # uses existing ssh key if available
-    if [ ! -f "{{ SSH_KEY_PATH }}" ]; thenshopt
+    if [ ! -f "{{ SSH_KEY_PATH }}" ]; then
         echo "Paste your SSH private key (input is hidden). Press Enter, then Ctrl+D when finished:"
 
         # creates or clears the file
@@ -186,51 +186,83 @@ dotfiles-sync:
         done < "$TRACKED_ENC"
     fi
 
-    echo "=> Discovering and tracking new files..."
+    echo "=> Discovering and evaluating files..."
 
-    # enables bash wildcard expansion for hidden files and prevents looping if no match exists
+    # creates memory map of currently managed files to avoid re-encrypting/re-adding
+    declare -A MANAGED_MAP
+    mapfile -t managed_list < <(chezmoi managed --include=files 2>/dev/null || true)
+    for m in "${managed_list[@]}"; do
+        MANAGED_MAP["$HOME/$m"]=1
+    done
+
+    TO_ADD_STD=()
+    TO_ADD_ENC=()
+    TEMP_FILES=$(mktemp)
+
+    # enables bash wildcard expansion
     shopt -s nullglob dotglob extglob
+    OLD_IFS="$IFS"
 
-    for pattern in "${ENC_LIST[@]}"; do
-        for target in $pattern; do
-            if [ -e "$target" ]; then
-                is_ignored=0
-                for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-                    if [[ "$target" == "$ex" ]] || [[ "$target" == "$ex"/* ]] || [[ "$target" =~ $ex ]]; then
-                        is_ignored=1
-                        break
-                    fi
-                done
-                if [ $is_ignored -eq 1 ]; then continue; fi
+    # Step 1: Gather exact files from all tracked folders
+    for pattern in "${ENC_LIST[@]}" "${TRACKED_LIST[@]}"; do
+        IFS=''
+        expanded_paths=( $pattern )
+        IFS="$OLD_IFS"
 
-                # only checks chezmoi status if a file resolves to avoid duplicate operations
-                if ! chezmoi managed "$target" > /dev/null 2>&1; then
-                    echo "  -> Encrypting & Adding new file: $target"
-                    chezmoi add --encrypt --force "$target"
-                fi
+        for target in "${expanded_paths[@]}"; do
+            if [ -d "$target" ]; then
+                find "$target" -type f 2>/dev/null >> "$TEMP_FILES"
+            elif [ -f "$target" ]; then
+                echo "$target" >> "$TEMP_FILES"
             fi
         done
     done
 
-    for pattern in "${TRACKED_LIST[@]}"; do
-        for target in $pattern; do
-            if [ -e "$target" ]; then
-                is_ignored=0
-                for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-                    if [[ "$target" == "$ex" ]] || [[ "$target" == "$ex"/* ]] || [[ "$target" =~ $ex ]]; then
-                        is_ignored=1
-                        break
-                    fi
-                done
-                if [ $is_ignored -eq 1 ]; then continue; fi
+    # Step 2: Filter and sort into bulk arrays
+    while IFS= read -r full_path; do
+        # immediately skip if already managed
+        if [[ -n "${MANAGED_MAP[$full_path]}" ]]; then
+            continue
+        fi
 
-                if ! chezmoi managed "$target" > /dev/null 2>&1; then
-                    echo "  -> Adding new file: $target"
-                    chezmoi add --force "$target"
-                fi
+        # evaluate exclusions (like zen-themes)
+        is_ignored=0
+        for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
+            if [[ "$full_path" == $ex ]] || [[ "$full_path" == $ex/* ]] || [[ "$full_path" =~ $ex ]]; then
+                is_ignored=1
+                break
             fi
         done
-    done
+        if [ $is_ignored -eq 1 ]; then continue; fi
+
+        # determine if file requires encryption
+        is_enc=0
+        for pat in "${ENC_LIST[@]}"; do
+            if [[ "$full_path" == $pat ]] || [[ "$full_path" == $pat/* ]] || [[ "$full_path" =~ $pat ]]; then
+                is_enc=1
+                break
+            fi
+        done
+
+        if [ $is_enc -eq 1 ]; then
+            TO_ADD_ENC+=("$full_path")
+        else
+            TO_ADD_STD+=("$full_path")
+        fi
+    done < <(sort -u "$TEMP_FILES")
+
+    rm -f "$TEMP_FILES"
+
+    # Step 3: Execute additions in bulk to prevent massive commit spam
+    if [ ${#TO_ADD_ENC[@]} -gt 0 ]; then
+        echo "  -> Encrypting & Adding ${#TO_ADD_ENC[@]} new file(s)..."
+        chezmoi add --encrypt --force "${TO_ADD_ENC[@]}"
+    fi
+
+    if [ ${#TO_ADD_STD[@]} -gt 0 ]; then
+        echo "  -> Adding ${#TO_ADD_STD[@]} new file(s)..."
+        chezmoi add --force "${TO_ADD_STD[@]}"
+    fi
 
     echo "=> Cleaning up orphaned and untracked files..."
 
@@ -243,23 +275,21 @@ dotfiles-sync:
         "$HOME/.config/systemd/user/dotfiles-upload.timer"
     )
 
-    # reads managed files into an array to avoid stdin pipe conflicts with chezmoi forget
-    mapfile -t managed_files < <(chezmoi managed)
+    TO_FORGET=()
 
-    for tracked_path in "${managed_files[@]}"; do
+    for tracked_path in "${managed_list[@]}"; do
         full_path="$HOME/$tracked_path"
 
-        # removes file from source state if missing from home directory
+        # mark for removal if deleted from disk
         if [ ! -e "$full_path" ]; then
-            echo "  -> Forgetting missing file: $full_path"
-            chezmoi forget --force "$full_path" || true
+            TO_FORGET+=("$full_path")
             continue
         fi
 
-        # checks if file matches exclusion patterns
+        # mark for removal if file now matches an exclusion pattern
         is_ignored=0
         for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-            if [[ "$full_path" == "$ex" ]] || [[ "$full_path" == "$ex"/* ]] || [[ "$full_path" =~ $ex ]]; then
+            if [[ "$full_path" == $ex ]] || [[ "$full_path" == $ex/* ]] || [[ "$full_path" =~ $ex ]]; then
                 is_ignored=1
                 break
             fi
@@ -267,25 +297,27 @@ dotfiles-sync:
 
         is_valid=0
         if [ $is_ignored -eq 0 ]; then
-            # checks if file path falls under any whitelist prefix, is a parent directory, or matches regex
             for prefix in "${VALID_PREFIXES[@]}"; do
-                if [[ "$full_path" == "$prefix" ]] || [[ "$full_path" == "$prefix"/* ]] || [[ "$prefix" == "$full_path"/* ]] || [[ "$full_path" =~ $prefix ]]; then
+                if [[ "$full_path" == $prefix ]] || [[ "$full_path" == $prefix/* ]] || [[ $prefix == "$full_path"/* ]] || [[ "$full_path" =~ $prefix ]]; then
                     is_valid=1
                     break
                 fi
             done
         fi
 
-        # untracks file if it is not in the whitelist or matches an exclusion
-        if [ $is_valid -eq 0 ]; then
-            echo "  -> Forgetting untracked file: $full_path"
-            chezmoi forget --force "$full_path" || true
+        if [ $is_valid -eq 0 ] || [ $is_ignored -eq 1 ]; then
+            TO_FORGET+=("$full_path")
         fi
     done
 
+    # execute removal in bulk
+    if [ ${#TO_FORGET[@]} -gt 0 ]; then
+        echo "  -> Forgetting ${#TO_FORGET[@]} untracked/excluded file(s)..."
+        chezmoi forget --force "${TO_FORGET[@]}"
+    fi
+
     echo "=> Committing and pushing changes..."
 
-    # checks for uncommitted changes or untracked files and suppresses false error outputs
     has_changes=0
     chezmoi git -- diff --quiet 2>/dev/null || has_changes=1
     chezmoi git -- diff --cached --quiet 2>/dev/null || has_changes=1
@@ -308,7 +340,6 @@ dotfiles-sync:
         fi
 
         echo "  -> Pushing to remote..."
-        # uses HEAD to automatically set upstream if it is missing
         chezmoi git -- push -u origin HEAD
     else
         echo "  -> No new changes to commit."
@@ -322,7 +353,6 @@ dotfiles-add *targets:
     if [ -n "{{ targets }}" ]; then
         for target in {{ targets }}; do
             abs_path=$(realpath "$target")
-            # restricts additions to files inside the home directory
             if [[ "$abs_path" == "$HOME/"* ]]; then
                 rel_path="${abs_path#$HOME/}"
                 echo "$rel_path" >> "{{ TRACKED_FILE }}"
@@ -340,7 +370,6 @@ dotfiles-add-secret *targets:
     if [ -n "{{ targets }}" ]; then
         for target in {{ targets }}; do
             abs_path=$(realpath "$target")
-            # restricts additions to files inside the home directory
             if [[ "$abs_path" == "$HOME/"* ]]; then
                 rel_path="${abs_path#$HOME/}"
                 echo "$rel_path" >> "{{ TRACKED_ENC_FILE }}"
@@ -408,7 +437,6 @@ dotfiles-clean-history:
     #!/usr/bin/env bash
     set -e
 
-    # prompts for initial destructive action confirmation with 15s timeout
     echo "Warning: This action will permanently delete all previous commit history."
     if ! read -t 15 -p "Are you sure you want to proceed? [y/N] " CONFIRM1; then
         echo -e "\nPrompt timed out. Operation cancelled."
@@ -420,7 +448,6 @@ dotfiles-clean-history:
         exit 0
     fi
 
-    # prompts for branch protection confirmation with 15s timeout
     echo ""
     echo "Warning: The force push will fail if your remote branch is protected."
     echo "Please verify branch protection is disabled here:"
@@ -437,26 +464,21 @@ dotfiles-clean-history:
 
     echo "Resetting repository history..."
 
-    # gets the current branch name
     BRANCH=$(chezmoi git -- branch --show-current)
     if [ -z "$BRANCH" ]; then
         BRANCH="main"
     fi
 
-    # creates a new detached history state
     chezmoi git -- checkout --orphan temp_branch
     chezmoi git -- add -A
     chezmoi git -- commit -m "chore: reset repository history"
 
-    # replaces the old branch with the new one
     chezmoi git -- branch -D "$BRANCH"
     chezmoi git -- branch -m "$BRANCH"
 
-    # forces the remote to accept the overwritten history
     echo "Force pushing to remote..."
     chezmoi git -- push -f -u origin "$BRANCH"
 
-    # runs aggressive garbage collection to free local space
     echo "Cleaning local garbage..."
     chezmoi git -- reflog expire --expire=now --all
     chezmoi git -- gc --prune=now --aggressive
