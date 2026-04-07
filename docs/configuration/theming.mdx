@@ -1,0 +1,81 @@
+---
+title: "Theming"
+description: "Desktop themes, icons, and visual customizations in Agate."
+---
+
+Agate ships with a curated set of desktop themes applied to KDE Plasma. Theme assets are baked into the image via `recipes/common-theming.yml`, so they are available immediately after rebase. Some themes also require a post-install setup step to fully activate in your user session.
+
+## Themes included
+
+| Theme | Description |
+|---|---|
+| **Catppuccin** | A pastel color scheme applied to KDE Plasma and supported applications |
+| **Kora** | A clean, flat icon theme for the KDE desktop |
+| **PlasMusic** | A KDE widget for music playback controls and now-playing information |
+
+## Desktop environments
+
+- **KDE Plasma** is the primary desktop environment. All themes and customizations target KDE Plasma by default.
+- **Niri** is an alternative Wayland compositor session available at the login screen. It is configured via `recipes/common-windowmanager.yml` and provides a tiling window manager experience alongside Plasma.
+
+## Branding and assets
+
+Custom wallpapers, icons, and cursor themes are managed by `recipes/common-branding.yml`. These assets are copied into the image at build time, so they are present on first boot without any additional steps.
+
+## Applying themes after rebase
+
+Some theme components need to be activated in your user session after you first rebase to Agate. Use the `agate-manage-themes` helper task to install and apply Catppuccin, Kora, and PlasMusic in one step.
+
+<Tip>
+  Run `just agate-manage-themes` after your first boot on Agate to fully activate all desktop themes in your user session.
+</Tip>
+
+<Steps>
+  <Step title="Rebase and reboot">
+    Complete the rebase to Agate and reboot into your new system. Theme assets are already present in the image.
+
+    ```bash
+    sudo rpm-ostree rebase ostree-unverified-registry:quay.io/fptbb/agate:latest
+    systemctl reboot
+    ```
+  </Step>
+
+  <Step title="Open a terminal">
+    After logging in to KDE Plasma, open a terminal application (e.g., Konsole).
+  </Step>
+
+  <Step title="Run the theme setup task">
+    Run the `agate-manage-themes` just task to install and activate Catppuccin, Kora, and PlasMusic for your user session.
+
+    ```bash
+    just agate-manage-themes
+    ```
+  </Step>
+
+  <Step title="Apply Spicetify for Spotify (optional)">
+    If you use Spotify, you can apply Spicetify theming separately with its own task. This patches the Spotify client with a matching color scheme.
+
+    ```bash
+    just agate-spicetify
+    ```
+  </Step>
+
+  <Step title="Log out and back in">
+    Log out of your session and log back in to ensure all theme changes are fully applied.
+  </Step>
+</Steps>
+
+## Customizing themes when building from source
+
+Theme assets and installation steps are defined in `recipes/common-theming.yml`. To swap out a theme or add new assets, edit that file and rebuild the image.
+
+```yaml
+# Example: adding a theme asset in common-theming.yml
+modules:
+  - type: files
+    files:
+      - source: themes/my-theme
+        destination: /usr/share/themes/my-theme
+```
+
+See [build image](/building/build-image) for the full rebuild workflow, and [recipes](/configuration/recipes) for an overview of how recipe files are structured.

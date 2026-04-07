@@ -1,0 +1,65 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "aspen",
+  "name": "Agate",
+  "logo": {
+    "light": "https://media.brand.dev/a2b8dfec-538c-4347-88db-48ebae42aae1.svg",
+    "dark": "https://media.brand.dev/7dd21241-e0ff-4f3a-9726-8e860bb4298b.svg"
+  },
+  "favicon": "https://media.brand.dev/d30ba7c4-c009-4989-955f-148c05fec87b.png",
+  "colors": {
+    "primary": "#fb6c24",
+    "light": "#fba224",
+    "dark": "#2f2e6d"
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "GitLab",
+      "href": "https://gitlab.com/fpsys/agate"
+    }
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "verification"
+        ]
+      },
+      {
+        "group": "Build from Source",
+        "pages": [
+          "building/prerequisites",
+          "building/build-image",
+          "building/build-iso"
+        ]
+      },
+      {
+        "group": "Configuration",
+        "pages": [
+          "configuration/recipes",
+          "configuration/packages",
+          "configuration/theming"
+        ]
+      },
+      {
+        "group": "Helper Scripts",
+        "pages": [
+          "scripts/dotfiles",
+          "scripts/security",
+          "scripts/development"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/justfile",
+          "reference/acknowledgements"
+        ]
+      }
+    ]
+  }
+}

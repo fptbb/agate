@@ -3,12 +3,42 @@ workflow:
         - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
           when: never
         - if: "$CI_COMMIT_TAG"
-        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: "$CI_PIPELINE_SOURCE == \"schedule\""
+        - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+          changes:
+              paths:
+                  - files/**/*
+                  - modules/**/*
+                  - recipes/**/*
+                  - scripts/**/*
+                  - .github/**/*
+                  - .gitlab-ci.yml
+                  - Justfile
+                  - README.md
+                  - LICENSE
+                  - artifacthub-repo.yml
+                  - artifacthub-repo-gh.yml
+                  - cosign.pub
+                  - renovate.json
+        - if: "$CI_COMMIT_BRANCH"
+          changes:
+              paths:
+                  - files/**/*
+                  - modules/**/*
+                  - recipes/**/*
+                  - scripts/**/*
+                  - .github/**/*
+                  - .gitlab-ci.yml
+                  - Justfile
+                  - README.md
+                  - LICENSE
+                  - artifacthub-repo.yml
+                  - artifacthub-repo-gh.yml
+                  - cosign.pub
+                  - renovate.json
+        # Daily Builds
         - if: "$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS"
           when: never
-        - if: "$CI_COMMIT_BRANCH"
-        # Daily Builds
-        - if: $CI_PIPELINE_SOURCE == "schedule"
 
 default:
     artifacts:

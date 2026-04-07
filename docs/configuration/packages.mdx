@@ -1,0 +1,86 @@
+---
+title: "Packages"
+description: "RPMs, Flatpaks, and extra repositories included in Agate."
+---
+
+Agate builds on top of `ghcr.io/ublue-os/bazzite-dx-nvidia:latest`, which already ships with gaming support, media codecs, NVIDIA drivers, and developer tooling from the Bazzite and Universal Blue projects. On top of that base, Agate adds extra COPR repositories, RPM packages, and Flatpak applications organized by purpose.
+
+<Note>
+  The exact package list is defined in `recipes/common-packages.yml` (RPMs) and `recipes/common-flatpaks.yml` (Flatpaks). These files are the authoritative source — the categories below reflect the intent, but the contents may change between releases.
+</Note>
+
+## Extra COPR repositories
+
+Agate enables the following COPR repositories before installing packages:
+
+| Repository | Purpose |
+|---|---|
+| `yadm` | Provides the `yadm` dotfiles manager |
+| `VeraCrypt` | Provides VeraCrypt for encrypted volume management |
+| `linuxtoys` | Provides Linux customization utilities |
+
+## Software categories
+
+<AccordionGroup>
+  <Accordion title="Development">
+    Tools for writing, running, and debugging software. This includes compilers, language runtimes, container tooling, and editor integrations. The `bazzite-dx` base image already includes many developer utilities; Agate extends that with additional packages from `common-development.yml`.
+  </Accordion>
+
+  <Accordion title="Gaming">
+    Gaming utilities and compatibility layers come primarily from the Bazzite base image. Bazzite ships Steam, Lutris, Proton, MangoHud, GameMode, and other gaming-focused tools out of the box. Agate inherits all of these without additional configuration.
+  </Accordion>
+
+  <Accordion title="Media">
+    Media playback codecs and editing tools. The Bazzite base includes codec support; Agate adds any additional media applications defined in the Flatpak and RPM recipe files.
+  </Accordion>
+
+  <Accordion title="Security">
+    Security-oriented packages added by Agate:
+
+    - **NordVPN** (`nordvpnd`) — VPN client daemon
+    - **OpenSnitch** (`opensnitch`) — application-level firewall
+    - **VeraCrypt** — encrypted volume management (via COPR)
+    - **Tailscale** (`tailscaled`) — mesh VPN
+    - **Netbird** (`netbird`) — peer-to-peer VPN overlay
+  </Accordion>
+
+  <Accordion title="Daily use">
+    Productivity and day-to-day applications installed as Flatpaks or RPMs. These cover communication, note-taking, and general-purpose desktop utilities. The full list is in `recipes/common-flatpaks.yml`.
+  </Accordion>
+</AccordionGroup>
+
+## Enabled system services
+
+The following systemd services are enabled in the image and start automatically on boot:
+
+| Service | Description |
+|---|---|
+| `nordvpnd` | NordVPN daemon |
+| `tailscaled` | Tailscale mesh VPN daemon |
+| `netbird` | Netbird peer-to-peer VPN daemon |
+| `podman.socket` | Podman API socket for container tooling |
+| `opensnitch` | OpenSnitch application firewall daemon |
+| `whatpulse` | WhatPulse input and network statistics daemon |
+
+## Managing packages
+
+Flatpaks and RPMs are each managed by a separate recipe file:
+
+- **RPMs** — edit `recipes/common-packages.yml` to add or remove RPM packages.
+- **Flatpaks** — edit `recipes/common-flatpaks.yml` to add or remove Flatpak applications.
+
+```yaml
+# Adding an RPM in common-packages.yml
+modules:
+  - type: rpm-ostree
+    install:
+      - your-package-name
+
+# Adding a Flatpak in common-flatpaks.yml
+modules:
+  - type: flatpak
+    install:
+      - com.example.App
+```
+
+After editing either file, rebuild the image for your changes to take effect. See [build image](/building/build-image) for the full build workflow.

@@ -1,0 +1,74 @@
+---
+title: "Recipes"
+description: "How Agate uses BlueBuild recipes to compose the image."
+---
+
+A BlueBuild **recipe** is a YAML file that declares what goes into the image — which packages to install, which files to copy, which services to enable, and how to configure the system. When you build Agate, BlueBuild reads the recipes and assembles them into a container image layer by layer.
+
+Agate's recipes live in the `recipes/` directory of the repository. The main entry point is `recipe.yml`, which includes all the other recipes in a defined order.
+
+<Note>
+  Editing a recipe file has no effect on a running system. You must rebuild the image and rebase to it for changes to take effect.
+</Note>
+
+## Recipe files
+
+<AccordionGroup>
+  <Accordion title="recipe.yml — main orchestrator">
+    The top-level recipe. It sets the base image (`ghcr.io/ublue-os/bazzite-dx-nvidia:latest`) and includes all the `common-*` recipes in order. This is the only file you pass to the BlueBuild build command. Every other recipe flows through this one.
+
+    For the authoritative recipe format and available fields, see the [BlueBuild recipe documentation](https://blue-build.org/reference/recipe/).
+  </Accordion>
+
+  <Accordion title="common-branding.yml — branding assets">
+    Copies custom wallpapers, icons, and logo files into the image. This is where Agate's visual identity is baked in — anything you want present on first boot goes here.
+  </Accordion>
+
+  <Accordion title="common-development.yml — development tools">
+    Installs development tools, runtimes, and configuration files used for software development. This includes compilers, language toolchains, container tooling, and IDE integrations.
+  </Accordion>
+
+  <Accordion title="common-dotfiles.yml — dotfiles manager integration">
+    Sets up the dotfiles manager (`yadm`) and any configuration needed to bootstrap it on a fresh install. This ensures your personal configuration is applied automatically after rebase.
+  </Accordion>
+
+  <Accordion title="common-flatpaks.yml — Flatpak applications">
+    Declares the list of Flatpak applications to install from Flathub and other remotes. Flatpaks are managed separately from RPMs to keep the two package sources distinct and easy to audit.
+  </Accordion>
+
+  <Accordion title="common-packages.yml — RPM packages">
+    Lists all extra RPM packages to layer on top of the base image. Packages are organized by category (development, security, utilities, etc.) and pulled from Fedora's repositories and any enabled COPR repos.
+  </Accordion>
+
+  <Accordion title="common-theming.yml — theme installation">
+    Installs desktop theme assets into the image: Catppuccin for KDE, the Kora icon theme, and the PlasMusic widget. These assets are baked into the image so they are available immediately after rebase.
+  </Accordion>
+
+  <Accordion title="common-windowmanager.yml — window manager session">
+    Configures the Niri Wayland compositor as an alternative session alongside KDE Plasma. This recipe installs Niri and registers its session with the display manager so you can select it at login.
+  </Accordion>
+</AccordionGroup>
+
+## Modifying recipes when building from source
+
+If you are building your own image from the Agate source, you can edit any recipe file to customize the result:
+
+1. Open the relevant `recipes/*.yml` file in your editor.
+2. Add, remove, or modify entries according to the [BlueBuild module documentation](https://blue-build.org/).
+3. Rebuild the image — your changes will be included in the next build.
+
+```yaml
+# Example: adding an RPM package in common-packages.yml
+modules:
+  - type: rpm-ostree
+    install:
+      - your-package-name
+```
+
+<Tip>
+  See the [build image](/building/build-image) page for the full build command and workflow.
+</Tip>
+
+## Further reading
+
+- [BlueBuild documentation](https://blue-build.org/) — full reference for recipe syntax, available modules, and image configuration options.

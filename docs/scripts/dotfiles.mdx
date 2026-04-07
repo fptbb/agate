@@ -1,0 +1,67 @@
+---
+title: "Dotfiles"
+description: "Manage your dotfiles with built-in just tasks."
+---
+
+Agate ships a dotfiles manager integration powered by [yadm](https://yadm.io/), installed via a COPR repository. A set of `just` tasks wraps the most common yadm workflows so you can bootstrap, sync, and apply your dotfiles without remembering the underlying commands.
+
+<Note>
+  These tasks use `yadm` under the hood. Before running them, make sure you have a dotfiles repository configured and accessible from your system.
+</Note>
+
+## Available tasks
+
+| Task | Description |
+| --- | --- |
+| `just dotfiles-bootstrap` | Initializes your dotfiles setup on a fresh system |
+| `just dotfiles-sync` | Syncs dotfiles from your remote repository |
+| `just dotfiles-apply` | Applies dotfiles to the current system |
+| `just dotfiles-inspect` | Shows the current dotfiles state and configuration |
+| `just dotfiles-clean` | Removes dotfiles artifacts and state |
+
+## Typical workflow
+
+Follow these steps after a fresh Agate install to get your dotfiles in place.
+
+<Steps>
+  <Step title="Bootstrap your dotfiles setup">
+    Run `dotfiles-bootstrap` to initialize yadm and prepare the system for your dotfiles.
+
+    ```bash
+    just dotfiles-bootstrap
+    ```
+  </Step>
+  <Step title="Sync from your remote repository">
+    Pull your dotfiles from the remote repository you have configured.
+
+    ```bash
+    just dotfiles-sync
+    ```
+  </Step>
+  <Step title="Apply dotfiles to the system">
+    Apply your dotfiles to their target locations on disk.
+
+    ```bash
+    just dotfiles-apply
+    ```
+  </Step>
+  <Step title="Verify the result">
+    Inspect the current dotfiles state to confirm everything applied correctly.
+
+    ```bash
+    just dotfiles-inspect
+    ```
+  </Step>
+</Steps>
+
+## Cleaning up
+
+If you need to remove your dotfiles artifacts and reset the state, run:
+
+```bash
+just dotfiles-clean
+```
+
+<Tip>
+  Learn more about yadm — including alternate files, encryption, and bootstrap scripts — in the [official yadm documentation](https://yadm.io/).
+</Tip>

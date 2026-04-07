@@ -1,0 +1,85 @@
+---
+title: "Verification"
+description: "Verify Agate image signatures with cosign."
+---
+
+Every Agate image is signed using [Sigstore cosign](https://github.com/sigstore/cosign). Verifying the signature before rebasing confirms that the image was built and published by the expected source, and has not been tampered with in transit or storage. This is an important step in securing your supply chain.
+
+<Tip>
+  Always verify the image before rebasing, especially if you are pulling from a mirror or have any reason to distrust the network path between you and the registry.
+</Tip>
+
+## How it works
+
+Agate uses cosign's keyful signing mode. A private key signs each image at build time, and the corresponding public key is published at `https://os.fpt.icu/cosign.pub`. You verify by providing that public key and the image reference — cosign checks the signature stored in the registry against the key.
+
+The images are also tracked on [Artifact Hub](https://artifacthub.io/), where you can find additional metadata and provenance information.
+
+## Verify the image
+
+<Steps>
+  <Step title="Install cosign">
+    Install cosign from the [official releases page](https://github.com/sigstore/cosign/releases) or via your package manager.
+
+    <Tabs>
+      <Tab title="Homebrew">
+        ```bash
+        brew install cosign
+        ```
+      </Tab>
+      <Tab title="Go install">
+        ```bash
+        go install github.com/sigstore/cosign/v2/cmd/cosign@latest
+        ```
+      </Tab>
+      <Tab title="RPM (Fedora)">
+        ```bash
+        sudo dnf install cosign
+        ```
+      </Tab>
+    </Tabs>
+
+    Confirm the installation:
+
+    ```bash
+    cosign version
+    ```
+  </Step>
+
+  <Step title="Obtain the public key">
+    The Agate cosign public key is hosted at `https://os.fpt.icu/cosign.pub`. You can reference it directly in the verify command, or download it locally for offline use:
+
+    ```bash
+    curl -O https://os.fpt.icu/cosign.pub
+    ```
+  </Step>
+
+  <Step title="Verify the image">
+    Run the verification command for the registry you are using.
+
+    <Tabs>
+      <Tab title="Quay.io (primary)">
+        ```bash
+        cosign verify --key https://os.fpt.icu/cosign.pub quay.io/fptbb/agate
+        ```
+      </Tab>
+      <Tab title="GitHub (mirror)">
+        ```bash
+        cosign verify --key https://os.fpt.icu/cosign.pub ghcr.io/fptbb/agate
+        ```
+      </Tab>
+    </Tabs>
+
+    If you downloaded the key file locally, replace the URL with the local path:
+
+    ```bash
+    cosign verify --key cosign.pub quay.io/fptbb/agate
+    ```
+  </Step>
+
+  <Step title="Interpret the output">
+    A successful verification prints JSON output containing the image digest, the certificate metadata, and the signature payload. The key lines to look for are a zero exit code and output that includes the verified image digest. Any failure — such as a key mismatch or an unsigned image — results in a non-zero exit and an error message.
+
+    If verification fails, do not rebase. The image may be corrupted or may not have been signed by the expected key.
+  </Step>
+</Steps>

@@ -1,0 +1,110 @@
+---
+title: "Development"
+description: "Install Nix, Devbox, and patch Spotify with Spicetify."
+---
+
+Agate ships helper tasks for installing development tooling and patching Spotify. Because Agate is an immutable image, these tasks handle the layering and setup steps for you.
+
+<Note>
+  Install Nix before Devbox. The `agate-devbox` task depends on Nix being present on the system.
+</Note>
+
+<Tabs>
+  <Tab title="Nix">
+    ## Nix package manager
+
+    The `agate-nixpkgs` task installs the [Nix package manager](https://nixos.org/) on top of the immutable Agate base. Nix gives you access to a large package ecosystem that complements RPMs and Flatpaks, covering packages not available through either channel.
+
+    ### Install Nix
+
+    <Steps>
+      <Step title="Run the installer task">
+        ```bash
+        just agate-nixpkgs
+        ```
+      </Step>
+      <Step title="Reload your shell environment">
+        After installation completes, reload your shell or open a new terminal so the Nix tooling is available on your `PATH`.
+
+        ```bash
+        exec $SHELL
+        ```
+      </Step>
+      <Step title="Verify the installation">
+        ```bash
+        nix --version
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Devbox">
+    ## Devbox
+
+    The `agate-devbox` task installs [Devbox](https://www.jetify.com/devbox), a Nix-based tool for creating reproducible, per-project development environments. Devbox lets you pin exact tool versions (Node, Python, Go, and more) for each project without touching the system.
+
+    <Tip>
+      Devbox is ideal for managing project-specific runtimes. Define a `devbox.json` in your project root to lock the exact versions of Node, Python, Go, or any other tool your project needs.
+    </Tip>
+
+    ### Install Devbox
+
+    <Steps>
+      <Step title="Install Nix first">
+        Devbox requires Nix. If you have not already installed it, run:
+
+        ```bash
+        just agate-nixpkgs
+        ```
+      </Step>
+      <Step title="Run the Devbox installer task">
+        ```bash
+        just agate-devbox
+        ```
+      </Step>
+      <Step title="Verify the installation">
+        ```bash
+        devbox version
+        ```
+      </Step>
+      <Step title="Initialize a project environment">
+        In any project directory, initialize a Devbox environment:
+
+        ```bash
+        devbox init
+        devbox shell
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Spicetify">
+    ## Spicetify
+
+    The `agate-spicetify` task patches the Spotify Flatpak and installs Spicetify Marketplace, enabling custom themes and extensions for Spotify.
+
+    <Note>
+      Spotify must be installed as a Flatpak before running this task. Install it from Flathub if you have not already done so.
+    </Note>
+
+    ### Install Spicetify
+
+    <Steps>
+      <Step title="Install Spotify from Flathub">
+        If Spotify is not already installed, add it from Flathub:
+
+        ```bash
+        flatpak install flathub com.spotify.Client
+        ```
+      </Step>
+      <Step title="Run the Spicetify task">
+        The task patches the Spotify Flatpak and installs the Spicetify Marketplace in one step.
+
+        ```bash
+        just agate-spicetify
+        ```
+      </Step>
+      <Step title="Open Spotify and browse the Marketplace">
+        Launch Spotify. The Spicetify Marketplace will be available in the sidebar, where you can install themes and extensions.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>

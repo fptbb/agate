@@ -1,0 +1,80 @@
+---
+title: "Build the image"
+description: "Build the Agate container image locally."
+---
+
+Running `just build` processes `recipes/recipe.yml` with the BlueBuild CLI and produces a local container image based on `ghcr.io/ublue-os/bazzite-dx-nvidia:latest`. The resulting image appears in your local container storage and can be used immediately or pushed to a registry.
+
+<Warning>
+  Builds can take a long time — often 20 minutes or more — because the base image is large and layers are assembled from scratch on the first run. Subsequent builds are faster due to layer caching.
+</Warning>
+
+## Build steps
+
+<Steps>
+  <Step title="Confirm prerequisites are in place">
+    Make sure Podman and Just are installed and the repository is cloned. See [Prerequisites](/building/prerequisites) if you haven't done this yet.
+  </Step>
+  <Step title="Validate the recipe (optional)">
+    Before building, validate your `recipes/recipe.yml` to catch configuration errors early:
+
+    ```bash
+    just validate
+    ```
+
+    <Tip>
+      Running `just validate` before a build saves time — catching syntax or schema errors up front means you won't wait through a long build only to hit a failure near the end.
+    </Tip>
+  </Step>
+  <Step title="Inspect the generated Containerfile (optional)">
+    If you want to review the full Containerfile that BlueBuild will use before committing to a build, generate it first:
+
+    ```bash
+    just generate
+    ```
+
+    This runs `bluebuild generate ./recipes/recipe.yml -o Containerfile` and writes the file to the project root. You can inspect it without triggering a build.
+  </Step>
+  <Step title="Build the image">
+    Run the build:
+
+    ```bash
+    just build
+    ```
+
+    This runs the following command under the hood:
+
+    ```bash
+    bluebuild build ./recipes/recipe.yml
+    ```
+
+    BlueBuild reads `recipes/recipe.yml`, resolves the base image and all configured modules, and builds the container image layer by layer via Podman.
+  </Step>
+  <Step title="Confirm the build succeeded">
+    After the build completes, verify the image is available in local container storage:
+
+    ```bash
+    podman images
+    ```
+
+    You should see the Agate image listed with a recent creation timestamp.
+  </Step>
+</Steps>
+
+## After a successful build
+
+Once the image is built, you can:
+
+- **Use it locally** — rebase your system onto the local image to test your changes before publishing.
+- **Push to a registry** — tag and push the image to a container registry (such as `quay.io` or `ghcr.io`) so others can rebase onto it.
+- **Generate a bootable ISO** — see [Build an ISO](/building/build-iso) to create installable media from the local image.
+
+## Cleaning up
+
+To remove cached BlueBuild artifacts and reclaim disk space:
+
+```bash
+just prune
+```
+
+This runs `bluebuild prune` and removes intermediate build artifacts.

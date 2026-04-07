@@ -4,9 +4,11 @@ on:
         - cron: "*/30 * * * *" # build every 30 minutes
     push:
         paths-ignore: # don't rebuild if only documentation has changed
-            - "**.md"
+            - "docs/**"
 
     pull_request:
+        paths-ignore:
+            - "docs/**"
     workflow_dispatch: # allow manually triggering builds
 concurrency:
     # only run one build at a time

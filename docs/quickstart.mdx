@@ -1,0 +1,78 @@
+---
+title: "Quick Start"
+description: "Rebase an existing Fedora Atomic system to Agate."
+---
+
+<Note>
+  Agate is a personal-use image. The customizations reflect one specific setup and may not suit your hardware or workflow. Review the [Introduction](/introduction) before rebasing to understand what is included.
+</Note>
+
+<Warning>
+  Rebasing replaces your entire OS image. Your home directory and layered packages are preserved, but your base system will switch to Agate. Make sure you have a backup or are comfortable with the rollback process before proceeding.
+</Warning>
+
+<Steps>
+  <Step title="Check prerequisites">
+    You need a running Fedora Atomic, Silverblue, or Bazzite system with `rpm-ostree` available. Verify with:
+
+    ```bash
+    rpm-ostree --version
+    ```
+
+    If the command is not found, your system does not support `rpm-ostree` rebasing.
+  </Step>
+
+  <Step title="Choose a registry">
+    Agate images are published to two registries. Use Quay.io as the primary source. The GitHub Container Registry is available as a mirror if Quay.io is unreachable.
+
+    | Registry | Image |
+    |---|---|
+    | Quay.io (primary) | `quay.io/fptbb/agate:latest` |
+    | GitHub (mirror) | `ghcr.io/fptbb/agate:latest` |
+  </Step>
+
+  <Step title="Run the rebase command">
+    Pick the registry you want to use and run the corresponding command.
+
+    <Tabs>
+      <Tab title="Quay.io (primary)">
+        ```bash
+        sudo rpm-ostree rebase ostree-unverified-registry:quay.io/fptbb/agate:latest
+        ```
+      </Tab>
+      <Tab title="GitHub (mirror)">
+        ```bash
+        sudo rpm-ostree rebase ostree-unverified-registry:ghcr.io/fptbb/agate:latest
+        ```
+      </Tab>
+    </Tabs>
+
+    `rpm-ostree` will pull the image and stage it as the next boot deployment. This may take several minutes depending on your connection speed.
+  </Step>
+
+  <Step title="Reboot">
+    After the rebase completes, reboot to boot into Agate:
+
+    ```bash
+    systemctl reboot
+    ```
+  </Step>
+
+  <Step title="Check deployment status">
+    After rebooting, confirm you are running Agate:
+
+    ```bash
+    sudo bootc status
+    ```
+
+    The output shows the current booted image, its digest, and any staged updates.
+  </Step>
+
+  <Step title="Verify the image (optional)">
+    For additional confidence in image integrity, verify the signature with cosign. See the [Verification](/verification) page for full instructions.
+
+    ```bash
+    cosign verify --key https://os.fpt.icu/cosign.pub quay.io/fptbb/agate
+    ```
+  </Step>
+</Steps>

@@ -1,0 +1,79 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "Agate",
+  "projectDescription": "A Fedora Bazzite-based atomic desktop OS image built with BlueBuild, featuring personal branding, curated software, and immutable system management.",
+  "theme": "aspen",
+  "primaryColor": "#fb6c24",
+  "lightColor": "#fba224",
+  "darkColor": "#2f2e6d",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "verification"
+        ]
+      },
+      {
+        "group": "Build from Source",
+        "pages": [
+          "building/prerequisites",
+          "building/build-image",
+          "building/build-iso"
+        ]
+      },
+      {
+        "group": "Configuration",
+        "pages": [
+          "configuration/recipes",
+          "configuration/packages",
+          "configuration/theming"
+        ]
+      },
+      {
+        "group": "Helper Scripts",
+        "pages": [
+          "scripts/dotfiles",
+          "scripts/security",
+          "scripts/development"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/justfile",
+          "reference/acknowledgements"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Atomic and rollback-friendly immutable system based on Fedora Bazzite",
+    "Built with BlueBuild for reproducible image construction",
+    "Cosign image signing for verified, trusted installs",
+    "Curated RPM and Flatpak software for development, gaming, and daily use",
+    "KDE desktop with Catppuccin theming, custom icons, and wallpapers",
+    "Helper Justfile tasks for dotfiles, Nix, YubiKey/LUKS, Spicetify, and more",
+    "Services pre-enabled: nordvpnd, tailscaled, netbird, podman, opensnitch",
+    "Niri Wayland compositor support alongside KDE"
+  ],
+  "publicApiSurface": [
+    "sudo rpm-ostree rebase ostree-unverified-registry:quay.io/fptbb/agate:latest",
+    "sudo rpm-ostree rebase ostree-unverified-registry:ghcr.io/fptbb/agate:latest",
+    "cosign verify --key https://os.fpt.icu/cosign.pub quay.io/fptbb/agate",
+    "just build",
+    "just build-iso",
+    "just build-iso-online",
+    "just generate",
+    "just validate",
+    "just prune",
+    "dotfiles-bootstrap / dotfiles-sync / dotfiles-apply",
+    "agate-nixpkgs / agate-devbox",
+    "agate-manage-themes",
+    "agate-spicetify",
+    "agate-luks-setup / agate-luks-remove",
+    "agate-kde-setup"
+  ]
+}

@@ -1,0 +1,72 @@
+---
+title: "Introduction"
+description: "What Agate is and what it includes."
+---
+
+Agate is a custom atomic desktop OS image built on top of [Fedora Bazzite](https://bazzite.gg/) using [BlueBuild](https://blue-build.org/). It layers a curated set of packages, services, and theming on top of the `bazzite-dx-nvidia` base image, giving you a reproducible, rollback-friendly desktop you can rebase onto any compatible Fedora Atomic system in a single command.
+
+<Note>
+  Agate is a personal-use image. The source is shared for reference only. The customizations reflect one specific setup and may not suit your hardware, workflow, or preferences. Use it as inspiration, or fork and adapt it for your own needs.
+</Note>
+
+## Key characteristics
+
+- **Atomic and immutable** — the OS root filesystem is read-only. Updates are applied as whole-image transactions, not incremental package changes, so your system is always in a consistent state.
+- **Rollback-friendly** — if an update causes problems, you can roll back to the previous deployment with a single command or at boot time.
+- **Signed with cosign** — every image is signed using [Sigstore cosign](https://github.com/sigstore/cosign), so you can verify the image before rebasing. See [Verification](/verification) for details.
+- **BlueBuild-managed** — the image is defined declaratively in YAML recipes, so every build is reproducible and auditable.
+
+## Pre-configured services
+
+Agate enables the following systemd services out of the box so they are running after rebase:
+
+- `nordvpnd` — NordVPN daemon
+- `tailscaled` — Tailscale mesh VPN
+- `netbird` — WireGuard-based overlay network
+- `podman.socket` — rootless Podman socket for container tooling
+- `opensnitch` — application-level firewall
+- `whatpulse` — input and usage statistics
+
+## Desktop and theming
+
+- **KDE Plasma** desktop environment (inherited from Bazzite)
+- **Catppuccin** color scheme applied system-wide
+- **Kora** icon theme
+- KDE-specific tweaks and defaults pre-applied
+
+## COPR repositories
+
+The following COPR repositories are enabled, making their packages available via `rpm-ostree`:
+
+- `yadm` — dotfile manager
+- `VeraCrypt` — disk encryption
+- `linuxtoys` — system tuning utilities
+
+## Software included
+
+Agate ships a curated selection of RPMs and Flatpaks covering:
+
+- **Development** — editors, runtimes, CLI tools, container utilities
+- **Gaming** — inherited from Bazzite's gaming-optimized base, with additional titles and launchers
+- **Media** — players, codecs, and production tools
+- **Security** — YubiKey support, LUKS helpers, firewall tooling
+
+## Helper Justfile tasks
+
+A `Justfile` is included with tasks to automate common post-install setup:
+
+- **Dotfiles** — clone and apply your dotfiles via `yadm`
+- **Nix** — install and configure the Nix package manager
+- **Spicetify** — apply custom Spotify theming
+- **YubiKey/LUKS** — enroll a YubiKey as a LUKS2 unlock factor
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Rebase an existing Fedora Atomic system to Agate with a single command.
+  </Card>
+  <Card title="Build from Source" icon="hammer" href="/building/prerequisites">
+    Clone the repository and build your own custom image locally.
+  </Card>
+</CardGroup>

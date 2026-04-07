@@ -1,0 +1,68 @@
+---
+title: "Security"
+description: "YubiKey-backed LUKS encryption and KDE authentication setup."
+---
+
+Agate ships helper tasks for integrating a hardware security key into your system. These tasks cover two areas: LUKS disk encryption and KDE/system authentication, both backed by a YubiKey.
+
+<Note>
+  A YubiKey hardware security key is required for all tasks on this page.
+</Note>
+
+## LUKS disk encryption
+
+Use these tasks to enroll or remove a YubiKey as a second factor for your LUKS-encrypted disk.
+
+### `just agate-luks-setup`
+
+Configures your LUKS-encrypted partition to use a YubiKey as a second authentication factor alongside your passphrase.
+
+```bash
+just agate-luks-setup
+```
+
+<Warning>
+  This operation modifies your LUKS key slots. Before running it, back up your existing LUKS recovery key or passphrase. Without a backup, losing your YubiKey could permanently lock you out of your encrypted data.
+</Warning>
+
+### `just agate-luks-remove`
+
+Removes the YubiKey from your LUKS configuration, reverting to passphrase-only authentication.
+
+```bash
+just agate-luks-remove
+```
+
+## KDE authentication
+
+Use this task to configure KDE to accept a YubiKey for screen unlock and `sudo` authentication via PAM.
+
+### `just agate-kde-setup`
+
+Configures KDE and PAM to use your YubiKey for screen unlock and login authentication.
+
+```bash
+just agate-kde-setup
+```
+
+## Typical setup flow
+
+<Steps>
+  <Step title="Enroll your YubiKey for LUKS">
+    Run `agate-luks-setup` to add your YubiKey as a second factor for disk encryption. Have your current LUKS passphrase and your YubiKey ready.
+
+    ```bash
+    just agate-luks-setup
+    ```
+  </Step>
+  <Step title="Configure KDE authentication">
+    Run `agate-kde-setup` to enable YubiKey-based screen unlock and sudo authentication in KDE.
+
+    ```bash
+    just agate-kde-setup
+    ```
+  </Step>
+  <Step title="Test before rebooting">
+    Verify that screen unlock and sudo authentication work with your YubiKey while you still have an active session. Only reboot once you have confirmed the setup is working correctly.
+  </Step>
+</Steps>

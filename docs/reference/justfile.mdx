@@ -1,0 +1,90 @@
+---
+title: "Justfile reference"
+description: "Complete reference for all available just commands."
+---
+
+Run `just` or `just --list` to see all available commands with descriptions.
+
+<Tip>
+  Run `just --list` at any time to print every available command alongside its description.
+</Tip>
+
+## Build commands
+
+These commands live in the root `Justfile` and drive the BlueBuild image lifecycle.
+
+| Command | Description | Underlying command |
+|---|---|---|
+| `just build` | Build the container image | `bluebuild build ./recipes/recipe.yml` |
+| `just generate` | Generate a Containerfile | `bluebuild generate ./recipes/recipe.yml -o Containerfile` |
+| `just validate` | Validate the BlueBuild recipe | `bluebuild validate` |
+| `just prune` | Prune BlueBuild artifacts | `bluebuild prune` |
+| `just build-iso` | Build a local bootable ISO from the local recipe | `sudo bluebuild generate-iso --iso-name agate.iso recipe recipes/recipe.yml` |
+| `just build-iso-online` | Build an ISO from the published image on Quay | `sudo bluebuild generate-iso --iso-name agate.iso image quay.io/fptbb/agate:latest` |
+
+### Usage examples
+
+```bash
+# Build the container image
+just build
+
+# Validate the recipe before building
+just validate
+
+# Generate a Containerfile for inspection
+just generate
+
+# Build a bootable ISO locally
+just build-iso
+
+# Build a bootable ISO from the latest published image
+just build-iso-online
+```
+
+## System helper tasks
+
+These commands are defined in `files/justfiles/*.just` and are available after rebasing to Agate.
+
+### Dotfiles
+
+Manage your personal dotfiles using the built-in dotfiles workflow.
+
+| Command | Description |
+|---|---|
+| `just dotfiles-bootstrap` | Bootstrap the dotfiles repository for first-time setup |
+| `just dotfiles-sync` | Pull the latest changes from your dotfiles repository |
+| `just dotfiles-apply` | Apply dotfiles to the current user's home directory |
+| `just dotfiles-inspect` | Inspect the current state of your dotfiles |
+| `just dotfiles-clean` | Remove symlinks and clean up dotfiles state |
+
+### Themes and apps
+
+Install and patch applications and theming tools.
+
+| Command | Description |
+|---|---|
+| `just agate-manage-themes` | Install Catppuccin, Kora icons, and PlasMusic |
+| `just agate-spicetify` | Patch Spotify and install Spicetify Marketplace |
+
+### Development tools
+
+Set up additional development environments.
+
+| Command | Description |
+|---|---|
+| `just agate-nixpkgs` | Install Nix package manager |
+| `just agate-devbox` | Install Devbox for reproducible dev environments |
+
+### Security
+
+Configure hardware-backed authentication and disk encryption.
+
+| Command | Description |
+|---|---|
+| `just agate-luks-setup` | Set up YubiKey-backed LUKS disk encryption |
+| `just agate-luks-remove` | Remove YubiKey-backed LUKS configuration |
+| `just agate-kde-setup` | Configure KDE login with YubiKey authentication |
+
+<Note>
+  Security tasks (`agate-luks-setup`, `agate-luks-remove`, `agate-kde-setup`) require a YubiKey to be present and configured. Run them as your regular user — they will prompt for elevated privileges where needed.
+</Note>

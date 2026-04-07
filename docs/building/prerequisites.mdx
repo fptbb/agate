@@ -1,0 +1,80 @@
+---
+title: "Prerequisites"
+description: "What you need before building Agate from source."
+---
+
+Building Agate from source means customizing the BlueBuild recipe and building your own container image — either to test local changes or to produce a variant tailored to your own hardware. The output is a signed OCI container image derived from `ghcr.io/ublue-os/bazzite-dx-nvidia:latest`.
+
+<Note>
+  Building requires significant free disk space (several gigabytes) and a working container runtime. Make sure Podman is running and accessible before you start.
+</Note>
+
+## Required tools
+
+You need two tools installed before you can build:
+
+- **Podman** — the container runtime used to build the image. Install it from [podman.io](https://podman.io/).
+- **Just** — the command runner that wraps all build tasks. Install it from [github.com/casey/just](https://github.com/casey/just).
+
+Optionally, you can install the **BlueBuild CLI** directly if you want to run `bluebuild` commands without the Justfile wrapper. The Justfile tasks use it under the hood, so having it available gives you more flexibility.
+
+## Setup
+
+<Steps>
+  <Step title="Install Podman">
+    Follow the [Podman installation guide](https://podman.io/docs/installation) for your distribution. On Fedora Atomic systems, Podman is already available.
+
+    Confirm it works:
+
+    ```bash
+    podman --version
+    ```
+  </Step>
+  <Step title="Install Just">
+    Install Just using your package manager or via the installer script. On Fedora:
+
+    ```bash
+    sudo dnf install just
+    ```
+
+    Or install from source using Cargo:
+
+    ```bash
+    cargo install just
+    ```
+
+    Confirm it works:
+
+    ```bash
+    just --version
+    ```
+  </Step>
+  <Step title="Clone the repository">
+    Clone the Agate source repository and enter the project directory:
+
+    ```bash
+    git clone git@gitlab.com:fpsys/agate.git
+    cd agate
+    ```
+  </Step>
+  <Step title="Review the Justfile">
+    The project uses a `Justfile` as its primary build interface. List available tasks to confirm your setup is working:
+
+    ```bash
+    just --list
+    ```
+
+    You should see targets including `build`, `build-iso`, `build-iso-online`, `generate`, `validate`, and `prune`.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Build the image" icon="hammer" href="/building/build-image">
+    Build the Agate container image locally from the recipe.
+  </Card>
+  <Card title="Build an ISO" icon="disc" href="/building/build-iso">
+    Create a bootable ISO you can use for fresh installs on new hardware.
+  </Card>
+</CardGroup>

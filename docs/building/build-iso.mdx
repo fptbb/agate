@@ -1,0 +1,93 @@
+---
+title: "Build an ISO"
+description: "Create a bootable ISO from your Agate image."
+---
+
+You can generate a bootable ISO from Agate in two ways: from your locally-built recipe, or directly from the published image on `quay.io`. Both approaches produce `agate.iso` in the project root directory, which you can flash to a USB drive and use for fresh installs on new hardware.
+
+<Note>
+  Both ISO build methods require `sudo` because the underlying `bluebuild generate-iso` command needs elevated privileges to mount and assemble the disk image.
+</Note>
+
+<Tabs>
+  <Tab title="From source">
+    Use this approach when you have made local changes to the recipe and want to build an ISO from your customized image — without publishing it to a registry first.
+
+    <Tip>
+      You need to run `just build` before this step so that your local image is available. See [Build the image](/building/build-image).
+    </Tip>
+
+    <Steps>
+      <Step title="Build the container image">
+        If you haven't already, build the local image:
+
+        ```bash
+        just build
+        ```
+      </Step>
+      <Step title="Generate the ISO">
+        Run the ISO build from your local recipe:
+
+        ```bash
+        just build-iso
+        ```
+
+        This runs the following command under the hood:
+
+        ```bash
+        sudo bluebuild generate-iso --iso-name agate.iso recipe recipes/recipe.yml
+        ```
+
+        BlueBuild reads `recipes/recipe.yml`, assembles the OS image, and writes `agate.iso` to the project root.
+      </Step>
+      <Step title="Locate the ISO">
+        When the build finishes, `agate.iso` appears in the root of the repository:
+
+        ```bash
+        ls -lh agate.iso
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="From published image">
+    Use this approach when you want a bootable ISO of the current release without building from source. This pulls the latest published image from `quay.io/fptbb/agate:latest` directly.
+
+    <Tip>
+      This method is faster than building from source because it skips the container image build step entirely and downloads the pre-built image instead.
+    </Tip>
+
+    <Steps>
+      <Step title="Generate the ISO">
+        Run the ISO build from the published image:
+
+        ```bash
+        just build-iso-online
+        ```
+
+        This runs the following command under the hood:
+
+        ```bash
+        sudo bluebuild generate-iso --iso-name agate.iso image quay.io/fptbb/agate:latest
+        ```
+
+        BlueBuild pulls `quay.io/fptbb/agate:latest`, assembles the OS image, and writes `agate.iso` to the project root.
+      </Step>
+      <Step title="Locate the ISO">
+        When the build finishes, `agate.iso` appears in the root of the repository:
+
+        ```bash
+        ls -lh agate.iso
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Using the ISO
+
+Once you have `agate.iso`, you can:
+
+- **Flash it to a USB drive** using a tool like [Ventoy](https://www.ventoy.net/) or `dd` and boot from it on a target machine.
+- **Boot it in a VM** — most hypervisors (QEMU/KVM, VirtualBox, VMware) accept ISO files directly as boot media.
+
+The ISO provides a full Agate live environment and installer, allowing you to perform a fresh install on any compatible system.

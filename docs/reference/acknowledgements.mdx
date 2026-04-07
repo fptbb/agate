@@ -1,0 +1,44 @@
+---
+title: "Acknowledgements"
+description: "Projects and people that make Agate possible."
+---
+
+Agate is built on the shoulders of open-source projects and the broader Fedora Atomic community. None of this would exist without the work of the people and teams below.
+
+## Core projects
+
+<CardGroup cols={2}>
+  <Card title="Universal Blue" icon="layer-group" href="https://universal-blue.org/">
+    The foundational project providing tooling, workflows, and community infrastructure that makes custom Fedora Atomic images practical to build and maintain.
+  </Card>
+  <Card title="BlueBuild" icon="hammer" href="https://blue-build.org/">
+    The build tool used to define, generate, and publish the Agate container image from a declarative recipe.
+  </Card>
+  <Card title="Fedora Bazzite" icon="linux" href="https://bazzite.gg/">
+    The upstream base image that Agate extends — a gaming- and desktop-optimised Fedora Atomic image from the Universal Blue project.
+  </Card>
+  <Card title="Sigstore / cosign" icon="shield-check" href="https://www.sigstore.dev/">
+    The image signing and verification infrastructure used to sign every Agate release, letting you verify authenticity before rebasing.
+  </Card>
+  <Card title="Artifact Hub" icon="package" href="https://artifacthub.io/packages/search?repo=agate">
+    The distribution platform where Agate images are published and discoverable. Agate is listed under the `agate` and `agate-alt` repositories.
+  </Card>
+</CardGroup>
+
+## Inspiration
+
+Agate draws inspiration from several community-built custom images that showed what was possible with Fedora Atomic and BlueBuild.
+
+- [VeneOS](https://github.com/Venefilyn/veneos) by Venefilyn
+- [amyos](https://github.com/astrovm/amyos) by astrovm
+- [m2os](https://github.com/m2Giles/m2os) by m2Giles
+
+## The name
+
+Agate is named after **Red Fox Agate** — a rare variety of chalcedony quartz found in Patagonia, Argentina, whose vibrant orange-red banding resembles the fur of a red fox. First documented in 1997, it remains one of the more distinctive agates in the mineral world.
+
+The name follows the Fedora Atomic Desktop tradition of naming custom images after minerals and rocks, placing Agate alongside projects like Silverblue (silver), Kinoite, and others in that lineage.
+
+## License
+
+Agate is released under the [Apache License 2.0](https://gitlab.com/fpsys/agate/-/blob/main/LICENSE). You are free to use, modify, and distribute it under the terms of that license.

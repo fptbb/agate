@@ -1,0 +1,64 @@
+---
+title: "Agate"
+description: "A Fedora Bazzite-based atomic desktop OS image — immutable, rollback-friendly, and tuned for developers."
+---
+
+Agate is a custom atomic desktop image built on top of [Fedora Bazzite](https://bazzite.gg/) using [BlueBuild](https://blue-build.org/). It ships as a signed container image you can rebase onto any compatible Fedora Atomic system in minutes, giving you a curated, reproducible desktop with development tools, gaming support, KDE theming, and security utilities pre-configured.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Rebase an existing Fedora Atomic system to Agate with a single command.
+  </Card>
+  <Card title="Verification" icon="shield-check" href="/verification">
+    Verify image integrity using cosign before rebasing.
+  </Card>
+  <Card title="Build from Source" icon="hammer" href="/building/prerequisites">
+    Clone the repo and build your own custom image locally.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/configuration/recipes">
+    Understand how recipes, packages, and theming are structured.
+  </Card>
+</CardGroup>
+
+## What's included
+
+<CardGroup cols={2}>
+  <Card title="Packages" icon="box" href="/configuration/packages">
+    Curated RPMs and Flatpaks for development, gaming, and daily use.
+  </Card>
+  <Card title="Theming" icon="palette" href="/configuration/theming">
+    Catppuccin, Kora icons, and KDE tweaks applied out of the box.
+  </Card>
+  <Card title="Helper Scripts" icon="terminal" href="/scripts/dotfiles">
+    Justfile tasks for dotfiles, Nix, Spicetify, and YubiKey/LUKS.
+  </Card>
+  <Card title="Justfile Reference" icon="book" href="/reference/justfile">
+    Full reference for all available `just` commands.
+  </Card>
+</CardGroup>
+
+## Getting started
+
+<Steps>
+  <Step title="Check prerequisites">
+    You need a running Fedora Atomic, Silverblue, or Bazzite system with `rpm-ostree` available.
+  </Step>
+  <Step title="Rebase to Agate">
+    Run the rebase command to switch your system to the Agate image.
+    ```bash
+    sudo rpm-ostree rebase ostree-unverified-registry:quay.io/fptbb/agate:latest
+    ```
+  </Step>
+  <Step title="Reboot">
+    After the rebase completes, reboot to boot into your new Agate system.
+    ```bash
+    systemctl reboot
+    ```
+  </Step>
+  <Step title="Verify the image (optional)">
+    Confirm the image signature using cosign.
+    ```bash
+    cosign verify --key https://os.fpt.icu/cosign.pub quay.io/fptbb/agate
+    ```
+  </Step>
+</Steps>
