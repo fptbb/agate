@@ -62,5 +62,20 @@
   "favicon": "https://gitlab.com/uploads/-/system/project/avatar/76001048/fp-logo.png",
   "appearance": {
     "default": "dark"
+  },
+  "seo": {
+    "indexing": "all"
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "interaction": {
+    "drilldown": true
+  },
+  "styling": {
+    "latex": true
+  },
+  "icons": {
+    "library": "lucide"
   }
 }
