@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -e
+
+# uses environment variable passed from justfile or defaults to standard repo
+REPO_PATH="${DOTFILES_REPO_PATH:-fptbb/dotfiles}"
+
+echo "Warning: This action will permanently delete all previous commit history."
+if ! read -t 15 -p "Are you sure you want to proceed? [y/N] " CONFIRM1; then
+    echo -e "\nPrompt timed out. Operation cancelled."
+    exit 0
+fi
+
+if [[ ! "$CONFIRM1" =~ ^[Yy]$ ]]; then
+    echo "Operation cancelled."
+    exit 0
+fi
+
+echo ""
+echo "Warning: The force push will fail if your remote branch is protected."
+echo "Please verify branch protection is disabled here:"
+echo "https://gitlab.com/${REPO_PATH}/-/settings/repository#js-protected-branches-settings"
+if ! read -t 15 -p "Have you disabled protection for your current branch? [y/N] " CONFIRM2; then
+    echo -e "\nPrompt timed out. Operation cancelled."
+    exit 0
+fi
+
+if [[ ! "$CONFIRM2" =~ ^[Yy]$ ]]; then
+    echo "Operation cancelled. Please disable branch protection and try again."
+    exit 0
+fi
+
+echo "Resetting repository history..."
+
+BRANCH=$(chezmoi git -- branch --show-current)
+if [ -z "$BRANCH" ]; then
+    BRANCH="main"
+fi
+
+chezmoi git -- checkout --orphan temp_branch
+chezmoi git -- add -A
+chezmoi git -- commit -m "chore: reset repository history"
+
+chezmoi git -- branch -D "$BRANCH"
+chezmoi git -- branch -m "$BRANCH"
+
+echo "Force pushing to remote..."
+chezmoi git -- push -f -u origin "$BRANCH"
+
+echo "Cleaning local garbage..."
+chezmoi git -- reflog expire --expire=now --all
+chezmoi git -- gc --prune=now --aggressive
+
+echo "History cleaned successfully."

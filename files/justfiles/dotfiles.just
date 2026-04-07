@@ -14,7 +14,7 @@ REPO_URL := env_var_or_default("DOTFILES_REPO_URL", "git@gitlab.com:" + REPO_PAT
 dotfiles-setup:
     #!/usr/bin/env bash
     set -e
-    mkdir -p ~/.ssh ~/.config/chezmoi ~/.config/systemd/user
+    mkdir -p ~/.ssh ~/.config/chezmoi
 
     # ensures dependencies are available
     for cmd in age chezmoi; do
@@ -79,15 +79,16 @@ dotfiles-setup:
 
     chezmoi apply --force
 
-    # re-creates the systemd sync services
-    printf "[Unit]\nDescription=Sync dotfiles and discover new files\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ujust dotfiles-sync\nRuntimeMaxSec=300\nStandardOutput=journal\nStandardError=journal\n" > ~/.config/systemd/user/dotfiles-upload.service
-    printf "[Unit]\nDescription=Run dotfiles sync periodically\n\n[Timer]\nOnBootSec=4h\nOnUnitActiveSec=4h\n\n[Install]\nWantedBy=timers.target\n" > ~/.config/systemd/user/dotfiles-upload.timer
-
-    chmod 644 ~/.config/systemd/user/dotfiles-upload.*
-    systemctl --user daemon-reload
-    systemctl --user enable --now dotfiles-upload.timer
-
-    echo "Setup complete. Services created and timer enabled."
+    # prompts user for background sync service activation
+    echo ""
+    read -p "Do you want to enable the automatic background sync timer? [y/N] " ENABLE_TIMER
+    if [[ "$ENABLE_TIMER" =~ ^[Yy]$ ]]; then
+        systemctl --user daemon-reload
+        systemctl --user enable --now dotfiles-upload.timer
+        echo "Setup complete. Background sync service enabled."
+    else
+        echo "Setup complete. Background sync skipped."
+    fi
 
     # triggers post-setup scripts
     /usr/bin/ujust dotfiles-bootstrap
@@ -121,231 +122,9 @@ dotfiles-bootstrap:
 dotfiles-sync:
     #!/usr/bin/env bash
     set -e
-    echo "Starting dotfiles sync engine..."
-
-    TRACKED="{{ TRACKED_FILE }}"
-    TRACKED_ENC="{{ TRACKED_ENC_FILE }}"
-
-    echo "=> Running chezmoi re-add..."
-    chezmoi re-add --force
-
-    # reads tracking lists into arrays and separates exclusion patterns
-    TRACKED_LIST=()
-    EXCLUDE_LIST=()
-    if [ -f "$TRACKED" ]; then
-        while IFS= read -r line || [ -n "$line" ]; do
-            if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
-
-            is_exclude=0
-            if [[ "$line" == !* ]]; then
-                is_exclude=1
-                line="${line#!}"
-            fi
-
-            if [[ "$line" == /* ]]; then
-                expanded="$line"
-            elif [[ "$line" == ~* ]]; then
-                expanded="${line/#\~/$HOME}"
-            else
-                expanded="$HOME/$line"
-            fi
-
-            if [ $is_exclude -eq 1 ]; then
-                EXCLUDE_LIST+=("$expanded")
-            else
-                TRACKED_LIST+=("$expanded")
-            fi
-        done < "$TRACKED"
-    fi
-
-    ENC_LIST=()
-    ENC_EXCLUDE_LIST=()
-    if [ -f "$TRACKED_ENC" ]; then
-        while IFS= read -r line || [ -n "$line" ]; do
-            if [ -z "$line" ] || [[ "$line" == \#* ]]; then continue; fi
-
-            is_exclude=0
-            if [[ "$line" == !* ]]; then
-                is_exclude=1
-                line="${line#!}"
-            fi
-
-            if [[ "$line" == /* ]]; then
-                expanded="$line"
-            elif [[ "$line" == ~* ]]; then
-                expanded="${line/#\~/$HOME}"
-            else
-                expanded="$HOME/$line"
-            fi
-
-            if [ $is_exclude -eq 1 ]; then
-                ENC_EXCLUDE_LIST+=("$expanded")
-            else
-                ENC_LIST+=("$expanded")
-            fi
-        done < "$TRACKED_ENC"
-    fi
-
-    echo "=> Discovering and evaluating files..."
-
-    # creates memory map of currently managed files to avoid re-encrypting/re-adding
-    declare -A MANAGED_MAP
-    mapfile -t managed_list < <(chezmoi managed --include=files 2>/dev/null || true)
-    for m in "${managed_list[@]}"; do
-        MANAGED_MAP["$HOME/$m"]=1
-    done
-
-    TO_ADD_STD=()
-    TO_ADD_ENC=()
-    TEMP_FILES=$(mktemp)
-
-    # enables bash wildcard expansion
-    shopt -s nullglob dotglob extglob
-    OLD_IFS="$IFS"
-
-    # Step 1: Gather exact files from all tracked folders
-    for pattern in "${ENC_LIST[@]}" "${TRACKED_LIST[@]}"; do
-        IFS=''
-        expanded_paths=( $pattern )
-        IFS="$OLD_IFS"
-
-        for target in "${expanded_paths[@]}"; do
-            if [ -d "$target" ]; then
-                find "$target" -type f 2>/dev/null >> "$TEMP_FILES"
-            elif [ -f "$target" ]; then
-                echo "$target" >> "$TEMP_FILES"
-            fi
-        done
-    done
-
-    # Step 2: Filter and sort into bulk arrays
-    while IFS= read -r full_path; do
-        # immediately skip if already managed
-        if [[ -n "${MANAGED_MAP[$full_path]}" ]]; then
-            continue
-        fi
-
-        # evaluate exclusions (like zen-themes)
-        is_ignored=0
-        for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-            if [[ "$full_path" == $ex ]] || [[ "$full_path" == $ex/* ]] || [[ "$full_path" =~ $ex ]]; then
-                is_ignored=1
-                break
-            fi
-        done
-        if [ $is_ignored -eq 1 ]; then continue; fi
-
-        # determine if file requires encryption
-        is_enc=0
-        for pat in "${ENC_LIST[@]}"; do
-            if [[ "$full_path" == $pat ]] || [[ "$full_path" == $pat/* ]] || [[ "$full_path" =~ $pat ]]; then
-                is_enc=1
-                break
-            fi
-        done
-
-        if [ $is_enc -eq 1 ]; then
-            TO_ADD_ENC+=("$full_path")
-        else
-            TO_ADD_STD+=("$full_path")
-        fi
-    done < <(sort -u "$TEMP_FILES")
-
-    rm -f "$TEMP_FILES"
-
-    # Step 3: Execute additions in bulk to prevent massive commit spam
-    if [ ${#TO_ADD_ENC[@]} -gt 0 ]; then
-        echo "  -> Encrypting & Adding ${#TO_ADD_ENC[@]} new file(s)..."
-        chezmoi add --encrypt --force "${TO_ADD_ENC[@]}"
-    fi
-
-    if [ ${#TO_ADD_STD[@]} -gt 0 ]; then
-        echo "  -> Adding ${#TO_ADD_STD[@]} new file(s)..."
-        chezmoi add --force "${TO_ADD_STD[@]}"
-    fi
-
-    echo "=> Cleaning up orphaned and untracked files..."
-
-    # builds whitelist of core configurations that must never be untracked
-    VALID_PREFIXES=(
-        "${TRACKED_LIST[@]}"
-        "${ENC_LIST[@]}"
-        "$HOME/.config/chezmoi"
-        "$HOME/.config/systemd/user/dotfiles-upload.service"
-        "$HOME/.config/systemd/user/dotfiles-upload.timer"
-    )
-
-    TO_FORGET=()
-
-    for tracked_path in "${managed_list[@]}"; do
-        full_path="$HOME/$tracked_path"
-
-        # mark for removal if deleted from disk
-        if [ ! -e "$full_path" ]; then
-            TO_FORGET+=("$full_path")
-            continue
-        fi
-
-        # mark for removal if file now matches an exclusion pattern
-        is_ignored=0
-        for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-            if [[ "$full_path" == $ex ]] || [[ "$full_path" == $ex/* ]] || [[ "$full_path" =~ $ex ]]; then
-                is_ignored=1
-                break
-            fi
-        done
-
-        is_valid=0
-        if [ $is_ignored -eq 0 ]; then
-            for prefix in "${VALID_PREFIXES[@]}"; do
-                if [[ "$full_path" == $prefix ]] || [[ "$full_path" == $prefix/* ]] || [[ $prefix == "$full_path"/* ]] || [[ "$full_path" =~ $prefix ]]; then
-                    is_valid=1
-                    break
-                fi
-            done
-        fi
-
-        if [ $is_valid -eq 0 ] || [ $is_ignored -eq 1 ]; then
-            TO_FORGET+=("$full_path")
-        fi
-    done
-
-    # execute removal in bulk
-    if [ ${#TO_FORGET[@]} -gt 0 ]; then
-        echo "  -> Forgetting ${#TO_FORGET[@]} untracked/excluded file(s)..."
-        chezmoi forget --force "${TO_FORGET[@]}"
-    fi
-
-    echo "=> Committing and pushing changes..."
-
-    has_changes=0
-    chezmoi git -- diff --quiet 2>/dev/null || has_changes=1
-    chezmoi git -- diff --cached --quiet 2>/dev/null || has_changes=1
-    if [ -n "$(chezmoi git -- ls-files --others --exclude-standard)" ]; then
-        has_changes=1
-    fi
-
-    if [ "$has_changes" -eq 1 ]; then
-        echo "  -> Staging changes..."
-        chezmoi git -- add .
-
-        has_staged=0
-        chezmoi git -- diff --cached --quiet 2>/dev/null || has_staged=1
-
-        if [ "$has_staged" -eq 1 ]; then
-            echo "  -> Creating commit..."
-            chezmoi git -- commit -m "chore: auto-sync dotfiles"
-        else
-            echo "  -> No changes staged for commit."
-        fi
-
-        echo "  -> Pushing to remote..."
-        chezmoi git -- push -u origin HEAD
-    else
-        echo "  -> No new changes to commit."
-    fi
-
-    echo "Sync engine finished."
+    DOTFILES_TRACKED="{{ TRACKED_FILE }}" \
+    DOTFILES_TRACKED_ENC="{{ TRACKED_ENC_FILE }}" \
+    dotfiles-sync
 
 # appends paths to standard tracking list and opens neovim
 dotfiles-add *targets:
@@ -436,51 +215,4 @@ dotfiles-edit-lists:
 dotfiles-clean-history:
     #!/usr/bin/env bash
     set -e
-
-    echo "Warning: This action will permanently delete all previous commit history."
-    if ! read -t 15 -p "Are you sure you want to proceed? [y/N] " CONFIRM1; then
-        echo -e "\nPrompt timed out. Operation cancelled."
-        exit 0
-    fi
-
-    if [[ ! "$CONFIRM1" =~ ^[Yy]$ ]]; then
-        echo "Operation cancelled."
-        exit 0
-    fi
-
-    echo ""
-    echo "Warning: The force push will fail if your remote branch is protected."
-    echo "Please verify branch protection is disabled here:"
-    echo "https://gitlab.com/{{ REPO_PATH }}/-/settings/repository#js-protected-branches-settings"
-    if ! read -t 15 -p "Have you disabled protection for your current branch? [y/N] " CONFIRM2; then
-        echo -e "\nPrompt timed out. Operation cancelled."
-        exit 0
-    fi
-
-    if [[ ! "$CONFIRM2" =~ ^[Yy]$ ]]; then
-        echo "Operation cancelled. Please disable branch protection and try again."
-        exit 0
-    fi
-
-    echo "Resetting repository history..."
-
-    BRANCH=$(chezmoi git -- branch --show-current)
-    if [ -z "$BRANCH" ]; then
-        BRANCH="main"
-    fi
-
-    chezmoi git -- checkout --orphan temp_branch
-    chezmoi git -- add -A
-    chezmoi git -- commit -m "chore: reset repository history"
-
-    chezmoi git -- branch -D "$BRANCH"
-    chezmoi git -- branch -m "$BRANCH"
-
-    echo "Force pushing to remote..."
-    chezmoi git -- push -f -u origin "$BRANCH"
-
-    echo "Cleaning local garbage..."
-    chezmoi git -- reflog expire --expire=now --all
-    chezmoi git -- gc --prune=now --aggressive
-
-    echo "History cleaned successfully."
+    DOTFILES_REPO_PATH="{{ REPO_PATH }}" dotfiles-clean-history
