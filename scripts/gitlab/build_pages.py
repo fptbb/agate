@@ -60,9 +60,13 @@ def main() -> None:
         render_redirect_html(ARTIFACTHUB_URL, "Page not found"),
         encoding="utf-8",
     )
+    (PUBLIC_DIR / "cosign.pub").write_text(
+        (REPO_ROOT / "cosign.pub").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
 
     for relative_path in tracked_files():
-        if relative_path == "index.html":
+        if relative_path in {"index.html", "cosign.pub"}:
             continue
 
         target_url = f"{RAW_BASE}/{relative_path}"
