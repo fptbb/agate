@@ -15,8 +15,9 @@ modules:
         - dgop
         - dsearch
         - matugen
+        - khal
 
-        # System related just to make sure
+        # system related just to make sure
         - qt6-qtmultimedia
         - cups-pk-helper
         - kf6-kwallet

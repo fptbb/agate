@@ -3,7 +3,7 @@ set -ouex pipefail
 
 echo "Configuring DankLinux (DMS) for Niri Wayland Session..."
 
-# links the user services to start when niri starts
+# links user services to start on niri launch
 mkdir -p /usr/lib/systemd/user/niri.service.wants
 ln -sf /usr/lib/systemd/user/dms.service /usr/lib/systemd/user/niri.service.wants/dms.service
 ln -sf /usr/lib/systemd/user/dsearch.service /usr/lib/systemd/user/niri.service.wants/dsearch.service
@@ -24,7 +24,7 @@ EOF
 
 echo "Portal configuration updated successfully."
 
-# creates a wrapper script to safely inject environment variables before niri starts
+# creates wrapper script to inject environment variables before niri starts
 cat << 'EOF' > /usr/bin/start-niri-agate
 #!/usr/bin/env bash
 
@@ -32,21 +32,23 @@ export XDG_CURRENT_DESKTOP=niri
 export QT_QPA_PLATFORMTHEME=qt6ct
 export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 
-dbus-update-activation-environment --systemd XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION
+# imports pam socket environments to systemd before niri triggers kwallet pam service
+systemctl --user import-environment PAM_KWALLET_LOGIN PAM_KWALLET5_LOGIN
+dbus-update-activation-environment --systemd XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION PAM_KWALLET_LOGIN PAM_KWALLET5_LOGIN
 
 niri-session
 
-# Clean up D-Bus activation environment to guarantee zero interference with Plasma
-systemctl --user unset-environment XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION
+# cleans up dbus activation environment to guarantee zero interference with plasma
+systemctl --user unset-environment XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION PAM_KWALLET_LOGIN PAM_KWALLET5_LOGIN
 dbus-update-activation-environment --systemd XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORMTHEME=kde QT_WAYLAND_DISABLE_WINDOWDECORATION=
 EOF
 
-# ensures the wrapper is executable
+# ensures wrapper is executable
 chmod +x /usr/bin/start-niri-agate
 
 NIRI_DESKTOP="/usr/share/wayland-sessions/niri.desktop"
 
-# updates the desktop entry to use the new wrapper script
+# updates desktop entry to use the new wrapper script
 if [ -f "$NIRI_DESKTOP" ]; then
     sed -i 's|^Exec=.*|Exec=/usr/bin/start-niri-agate|' "$NIRI_DESKTOP"
     echo "Niri desktop file updated successfully."
