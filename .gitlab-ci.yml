@@ -125,6 +125,24 @@ publish-metadata:
               --file-media-type "application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml" \
               $DEST_REPO
 
+pages:
+    stage: deploy
+    image: alpine:latest
+    rules:
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    script:
+        - rm -rf public
+        - mkdir -p public
+        - cp index.html public/index.html
+        - |
+            cat > public/_redirects <<'EOF'
+            /cosign.pub https://gitlab.com/fpsys/agate/-/raw/main/cosign.pub 301
+            EOF
+    artifacts:
+        paths:
+            - public
+        expire_in: 1 week
+
 cleanup-old-tags:
     extends: .python-job
     stage: cleanup
