@@ -1,6 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# cosign
 cosign.key
 cosign.private
+
+# Bluebuild
 /Containerfile
-/.bluebuild-scripts_*
-/*.iso*
-/files/scripts/*.rpm
+*.iso*
