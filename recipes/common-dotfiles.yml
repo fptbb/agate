@@ -7,6 +7,10 @@ modules:
     file-conflict-policy: skip
     disable-init: true
     run-every: '4h'
+  - type: files
+    files:
+      - source: dotfiles-manager
+        destination: /
   - type: justfiles
     validate: true
     include:
