@@ -9,3 +9,7 @@ cosign.private
 # Bluebuild
 /Containerfile
 *.iso*
+
+# Titanoboa local
+titanoboa/
+installer/
