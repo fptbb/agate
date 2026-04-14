@@ -4,13 +4,17 @@ spec:
             type: boolean
             default: false
             description: "forces pipeline to build images regardless of update checks"
+        simulate_schedule:
+            type: boolean
+            default: false
+            description: "simulates a scheduled pipeline run to test update logic"
 ---
 workflow:
     rules:
         - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
           when: never
         - if: "$CI_COMMIT_TAG"
-        - if: "$CI_PIPELINE_SOURCE == \"schedule\""
+        - if: '$CI_PIPELINE_SOURCE == "schedule" || $SIMULATE_SCHEDULE == "true"'
         - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
           changes:
               paths:
@@ -56,6 +60,7 @@ variables:
     UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
     UPSTREAM_REGISTRY: "ghcr.io"
     FORCE_BUILD: "$[[ inputs.force_build ]]"
+    SIMULATE_SCHEDULE: "$[[ inputs.simulate_schedule ]]"
 
 
 .python-job:
@@ -74,7 +79,7 @@ check-update:
     image: fedora:latest
     stage: check
     rules:
-        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: '$CI_PIPELINE_SOURCE == "schedule" || $SIMULATE_SCHEDULE == "true"'
     artifacts:
         expire_in: 1 day
         reports:
@@ -112,11 +117,13 @@ build-image:
         DOCKER_TLS_VERIFY: 1
         DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
     before_script:
-        # skips build on scheduled pipelines if no update is found
+        # skips build on scheduled or simulated pipelines if no update is found
         - |
-            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
-              echo "No update found. Skipping build."
-              exit 0
+            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$SIMULATE_SCHEDULE" = "true" ]; then
+              if [ "$FORCE_BUILD" != "true" ]; then
+                echo "No update found. Skipping build."
+                exit 0
+              fi
             fi
         # pulls secure files into the build
         - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
@@ -142,11 +149,13 @@ publish-metadata:
         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
         - if: $CI_COMMIT_TAG
     before_script:
-        # skips publish on scheduled pipelines if no update is found
+        # skips publish on scheduled or simulated pipelines if no update is found
         - |
-            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
-              echo "No update found. Skipping publish."
-              exit 0
+            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$SIMULATE_SCHEDULE" = "true" ]; then
+              if [ "$FORCE_BUILD" != "true" ]; then
+                echo "No update found. Skipping publish."
+                exit 0
+              fi
             fi
         - apk add --no-cache curl
         - curl -L https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64 > /usr/local/bin/regctl
@@ -195,10 +204,12 @@ cleanup-old-tags:
         MAX_KEEP: "5"
         DRY_RUN: "false"
     script:
-        # skips cleanup on scheduled pipelines if no update is found
+        # skips cleanup on scheduled or simulated pipelines if no update is found
         - |
-            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
-              echo "No update found. Skipping cleanup."
-              exit 0
+            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$SIMULATE_SCHEDULE" = "true" ]; then
+              if [ "$FORCE_BUILD" != "true" ]; then
+                echo "No update found. Skipping cleanup."
+                exit 0
+              fi
             fi
         - python3 -m scripts.gitlab.cleanup_old_tags
