@@ -1,3 +1,10 @@
+spec:
+    inputs:
+        force_build:
+            type: boolean
+            default: false
+            description: "forces pipeline to build images regardless of update checks"
+---
 workflow:
     rules:
         - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
@@ -36,7 +43,7 @@ workflow:
                   - artifacthub-repo-gh.yml
                   - cosign.pub
                   - renovate.json
-        # Daily Builds
+        # daily builds
         - if: "$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS"
           when: never
 
@@ -48,6 +55,7 @@ variables:
     IMAGE_NAME: "agate"
     UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
     UPSTREAM_REGISTRY: "ghcr.io"
+    FORCE_BUILD: "$[[ inputs.force_build ]]"
 
 
 .python-job:
@@ -97,25 +105,25 @@ build-image:
             - RECIPE:
                   - recipe.yml
     variables:
-        # Setup a secure connection with docker-in-docker service
+        # configures a secure connection with docker-in-docker service
         # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html
         DOCKER_HOST: tcp://docker:2376
         DOCKER_TLS_CERTDIR: /certs
         DOCKER_TLS_VERIFY: 1
         DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
     before_script:
-        # On scheduled pipelines, skip build if no update was found
+        # skips build on scheduled pipelines if no update is found
         - |
             if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
               echo "No update found. Skipping build."
               exit 0
             fi
-        # Pulls secure files into the build
+        # pulls secure files into the build
         - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
         - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
         - docker login $BB_REGISTRY -u $BB_USERNAME -p $BB_PASSWORD
     script:
-        - sleep 5 # Wait a bit for the docker-in-docker service to start
+        - sleep 5 # delays execution to allow docker-in-docker service to start
         - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
         - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
 
@@ -134,7 +142,7 @@ publish-metadata:
         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
         - if: $CI_COMMIT_TAG
     before_script:
-        # On scheduled pipelines, skip if no update was found
+        # skips publish on scheduled pipelines if no update is found
         - |
             if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
               echo "No update found. Skipping publish."
@@ -187,7 +195,7 @@ cleanup-old-tags:
         MAX_KEEP: "5"
         DRY_RUN: "false"
     script:
-        # On scheduled pipelines, skip if no update was found
+        # skips cleanup on scheduled pipelines if no update is found
         - |
             if [ "$CI_PIPELINE_SOURCE" = "schedule" ] && [ "$FORCE_BUILD" != "true" ]; then
               echo "No update found. Skipping cleanup."
