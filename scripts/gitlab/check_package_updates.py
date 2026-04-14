@@ -1,5 +1,5 @@
 import os
-import yaml
+import yaml # type: ignore
 import subprocess
 import time
 import shutil

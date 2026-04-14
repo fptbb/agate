@@ -6,7 +6,7 @@ modules:
       cleanup: true
       copr:
         - avengemedia/dms
-        - avengemedia/danksearch
+        - avengemedia/danklinux
     install:
       packages:
         - niri
