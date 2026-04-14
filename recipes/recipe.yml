@@ -18,6 +18,7 @@ modules:
   - from-file: common-development.yml
   - from-file: common-windowmanager.yml
   - from-file: common-dotfiles.yml
+  - from-file: common-debloat.yml
   - from-file: common-branding.yml
 
   - type: signing

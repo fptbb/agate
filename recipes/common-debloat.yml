@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: systemd
+    system:
+      masked:
+        # disables handheld and living room specific daemons on desktop
+        - hhd.service
+        - jupiter-biosupdate.service
+        - jupiter-controller-update.service
+        - bazzite-tdpfix.service
+        - pipewire-workaround.service
+        - wireplumber-workaround.service
+        - cec-onboot.service
+        - cec-onpoweroff.service
+        - cec-onsleep.service
+        - ds-inhibit.service
+        - raid-check.timer
