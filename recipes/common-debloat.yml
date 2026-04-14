@@ -16,3 +16,50 @@ modules:
         - cec-onsleep.service
         - ds-inhibit.service
         - raid-check.timer
+        # hardware mismatches and legacy raid
+        - thermald.service
+        - mdmonitor.service
+        # virtual machine guest tools
+        - vmtoolsd.service
+        - vgauthd.service
+        - vboxservice.service
+        # enterprise network storage (nfs/iscsi)
+        - nfs-server.service
+        - nfs-mountd.service
+        - nfs-idmapd.service
+        - nfsdcld.service
+        - rpcbind.service
+        - rpc-statd.service
+        - iscsid.service
+        - iscsi-init.service
+        - iscsi-onboot.service
+        - iscsi-shutdown.service
+        - iscsiuio.service
+        - iscsid.socket
+        - iscsiuio.socket
+        - sssd-kcm.socket
+        # enterprise identity management
+        - sssd.service
+        - sssd-kcm.service
+        # unused storage and package manager daemons
+        - lvm2-lvmpolld.socket
+        # local virtual machine hosting suite
+        - libvirtd.service
+        - libvirtd.socket
+        - virtinterfaced.socket
+        - virtlockd.socket
+        - virtlogd.socket
+        - virtlxcd.socket
+        - virtnetworkd.socket
+        - virtnodedevd.socket
+        - virtnwfilterd.socket
+        - virtproxyd.socket
+        - virtqemud.socket
+        - virtsecretd.socket
+        - virtstoraged.socket
+        - virtvboxd.socket
+        # others
+        - switcheroo-control.service
+        - NetworkManager-wait-online.service
+        - rpm-ostree-countme.timer
+        - dnf-makecache.timer
