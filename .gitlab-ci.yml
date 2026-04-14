@@ -63,7 +63,7 @@ stages:
     - cleanup
 
 check-update:
-    extends: .python-job
+    image: fedora:latest
     stage: check
     rules:
         - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -71,8 +71,11 @@ check-update:
         expire_in: 1 day
         reports:
             dotenv: build.env
+    before_script:
+        - dnf install -y python3 python3-requests python3-pyyaml
     script:
         - python3 -m scripts.gitlab.check_update
+        - python3 -m scripts.gitlab.check_package_updates
 
 build-image:
     stage: build
