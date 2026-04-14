@@ -23,7 +23,6 @@ modules:
         # Networking & VPNs
         - nordvpn # nordvpn's cli client for linux
         - tailscale # a zero-config vpn and private network tool
-        - cloudflare-warp # cloudflare's vpn and dns resolver client
         - libpcap # packet capture library for network sniffing tools
 
         # System Utilities & CLI Enhancement
@@ -37,11 +36,10 @@ modules:
         - gnupg2 # openpgp encryption and signing tools
         - veracrypt # disk encryption software based on truecrypt
         - fuse-encfs # encrypted filesystem support via fuse
+        - kleopatra # gpg key manager and certificate manager
 
         # Development & Image Management
         - buildah # build oci/docker images without needing a daemon
-        - copr-cli # manage fedora copr repositories from the command line
-        - coreos-installer # tool to install fedora coreos systems
         - fp-appimage-updater # declarative appimage updater
         - upx # ultimate packer for executables (binary compressor)
 
@@ -49,11 +47,8 @@ modules:
         - kde-partitionmanager # gui tool to manage disk partitions
         - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images
         - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension
-        - megatools # access mega.nz cloud storage from cli
 
         # Windows Compatibility & Gaming
-        - wine # a compatibility layer for windows applications
-        - winetricks # work around common problems in wine
         - gameconqueror # cheat engine for linux (debug and memory edit)
 
         # Dotfiles, Automation & Secrets
@@ -66,12 +61,12 @@ modules:
       # - opensnitch.sh
       - fido2.sh
       - appimage-updater.sh
-      - install-protonvpn.sh
+      # - install-protonvpn.sh
   - type: systemd
     system:
       enabled:
         - nordvpnd
         - tailscaled
-        - me.proton.vpn.split_tunneling.service
+        # - me.proton.vpn.split_tunneling.service
         # - whatpulse-pcap-service
         # - opensnitch

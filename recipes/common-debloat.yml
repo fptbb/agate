@@ -63,3 +63,4 @@ modules:
         - NetworkManager-wait-online.service
         - rpm-ostree-countme.timer
         - dnf-makecache.timer
+        - input-remapper.service
