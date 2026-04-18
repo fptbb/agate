@@ -22,4 +22,4 @@ def parse_iso_datetime(date_str):
 
 def write_key_value_file(path, key, value):
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write(f"{key}={value}")
+        fh.write(f"{key}={value}\n")

@@ -155,10 +155,10 @@ if __name__ == "__main__":
 
     if packages:
         if check_for_recent_updates(packages):
-            print("\nWriting FORCE_BUILD to build.env")
+            print("\nWriting FORCE_BUILD=true to build.env")
             with open('build.env', 'a') as f:
-                f.write('FORCE_BUILD="true"\n')
+                f.write('FORCE_BUILD=true\n')
         else:
-            print("\nNo updates required. Env file not created.")
+            print("\nNo package updates required.")
     else:
         print("Failed to extract any packages from the parsed files.")
