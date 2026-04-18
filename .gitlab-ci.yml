@@ -132,7 +132,14 @@ build-image:
     script:
         - sleep 5 # delays execution to allow docker-in-docker service to start
         - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
-        - bluebuild build --verbose --cache-layers --compression-format zstd --push ./recipes/$RECIPE
+        - |
+            BLUEBUILD_CACHE_FLAG=""
+            if [ "$FORCE_BUILD" != "true" ]; then
+              BLUEBUILD_CACHE_FLAG="--cache-layers"
+            else
+              echo "FORCE_BUILD=true; rebuilding without layer cache."
+            fi
+            bluebuild build --verbose $BLUEBUILD_CACHE_FLAG --compression-format zstd --push ./recipes/$RECIPE
 
 publish-metadata:
     stage: publish
