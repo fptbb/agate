@@ -4,6 +4,8 @@ import subprocess
 import time
 import shutil
 
+from scripts.ci.common import write_key_value_file
+
 def is_root():
     return os.geteuid() == 0
 
@@ -156,8 +158,7 @@ if __name__ == "__main__":
     if packages:
         if check_for_recent_updates(packages):
             print("\nWriting FORCE_BUILD=true to build.env")
-            with open('build.env', 'a') as f:
-                f.write('FORCE_BUILD=true\n')
+            write_key_value_file("build.env", "FORCE_BUILD", "true")
         else:
             print("\nNo package updates required.")
     else:

@@ -21,5 +21,18 @@ def parse_iso_datetime(date_str):
 
 
 def write_key_value_file(path, key, value):
+    lines = []
+    key_prefix = f"{key}="
+
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                if not line.startswith(key_prefix):
+                    lines.append(line.rstrip("\n"))
+    except FileNotFoundError:
+        pass
+
+    lines.append(f"{key}={value}")
+
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write(f"{key}={value}\n")
+        fh.write("\n".join(lines) + "\n")
