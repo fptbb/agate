@@ -55,6 +55,7 @@ modules:
         - chezmoi # manage your dotfiles across multiple machines
         - age # simple, modern and secure file encryption tool
         - expect # automate interactive applications with scripts
+        - rbw # bitwarden cli client for managing secrets in the terminal
   - type: script
     scripts:
       # - whatpulse.sh
