@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# gets installed appimages count
+appimg=$(fp-appimage-updater list --json 2>/dev/null | jq '.apps | map(select(.local_version != null)) | length')
+
+# defaults to 0 if the command fails
+appimg="${appimg:-0}"
+
+# parses fastfetch raw output, sums package variants, and formats the output string
+command fastfetch -c none -s packages --format json | jq -r --arg app "$appimg" '
+  .[0].result as $r |
+  
+  ($r.rpm // 0) as $rpm |
+  (($r.nixUser // 0) + ($r.nixDefault // 0) + ($r.nix // 0)) as $nix |
+  (($r.brew // 0) + ($r.brewCask // 0)) as $brew |
+  (($r.flatpakSystem // 0) + ($r.flatpakUser // 0) + ($r.flatpak // 0)) as $ftpk |
+  ($app | tonumber) as $appNum |
+  
+  # formats rpm count to 3,2k format if 1000 or higher
+  (
+    if $rpm >= 1000 then
+      ((($rpm / 100) | round / 10) | tostring | sub("\\."; ",")) + "k"
+    else
+      ($rpm | tostring)
+    end
+  ) as $rpmFmt |
+  
+  [
+    (if $rpm > 0 then "\($rpmFmt) (rpm)" else empty end),
+    (if $nix > 0 then "\($nix) (nix)" else empty end),
+    (if $brew > 0 then "\($brew) (brew)" else empty end),
+    (if $ftpk > 0 then "\($ftpk) (ftpk)" else empty end),
+    (if $appNum > 0 then "\($appNum) (appimg)" else empty end)
+  ] | join(", ")
+'
