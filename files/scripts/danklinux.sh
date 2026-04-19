@@ -52,16 +52,7 @@ export KDE_SESSION_VERSION=6
 export QT_QPA_PLATFORMTHEME=qt6ct
 export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 
-# forces electron and chromium to use native wayland and drop xwayland titlebars
-export OZONE_PLATFORM_HINT=auto
-export ELECTRON_OZONE_PLATFORM_HINT=auto
-
-# passes all session variables to dbus so flatpaks and background apps inherit them
-dbus-update-activation-environment --systemd XDG_CURRENT_DESKTOP KDE_SESSION_VERSION QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION PAM_KWALLET5_LOGIN PAM_KWALLET_LOGIN OZONE_PLATFORM_HINT ELECTRON_OZONE_PLATFORM_HINT
-
-# strips gtk window controls in the background
-# kde will automatically overwrite this on its next login via the kde-gtk-config daemon
-(sleep 2 && gsettings set org.gnome.desktop.wm.preferences button-layout '') &
+dbus-update-activation-environment --systemd XDG_CURRENT_DESKTOP KDE_SESSION_VERSION QT_QPA_PLATFORMTHEME QT_WAYLAND_DISABLE_WINDOWDECORATION PAM_KWALLET5_LOGIN PAM_KWALLET_LOGIN
 
 exec niri-session
 EOF
