@@ -1,12 +1,15 @@
 #!/bin/bash
 
+# argument: all (default), host, distrobox
+MODE="${1:-all}"
+
 # paths - using /var/lib/agate for persistent state data
 # Note: Directory permissions are managed via /usr/lib/tmpfiles.d/agate.conf
 CACHE_FILE="/var/lib/agate/package-counts.json"
 
 # ensure cache exists with defaults (silently fail if directory doesn't exist)
 if [[ ! -f "$CACHE_FILE" ]]; then
-    if [[ -d "$(dirname "$CACHE_FILE")" ]]; then
+    if [[ -w "$(dirname "$CACHE_FILE")" ]]; then
         echo '{"fedora": 0, "alpine": 0}' > "$CACHE_FILE" 2>/dev/null || true
     fi
 fi
@@ -76,18 +79,23 @@ fastfetch_json=$(cat "$TMP_DIR/fastfetch" 2>/dev/null || echo "[]")
 # Update cache if counts changed and are valid (>0)
 if [[ "$fedora_count" -gt 0 || "$alpine_count" -gt 0 ]]; then
     # merge new counts into cache (silently skip if directory is not writable)
-    jq -n --arg f "$fedora_count" --arg a "$alpine_count" \
-       --argjson last_f "$FEDORA_LAST" --argjson last_a "$ALPINE_LAST" \
-       '{fedora: (if ($f|tonumber) > 0 then ($f|tonumber) else $last_f end), 
-         alpine: (if ($a|tonumber) > 0 then ($a|tonumber) else $last_a end)}' \
-       2>/dev/null > "$CACHE_FILE.tmp" && mv "$CACHE_FILE.tmp" "$CACHE_FILE" 2>/dev/null || true
+    if [[ -w "$(dirname "$CACHE_FILE")" ]]; then
+        if jq -n --arg f "$fedora_count" --arg a "$alpine_count" \
+           --argjson last_f "$FEDORA_LAST" --argjson last_a "$ALPINE_LAST" \
+           '{fedora: (if ($f|tonumber) > 0 then ($f|tonumber) else $last_f end), 
+             alpine: (if ($a|tonumber) > 0 then ($a|tonumber) else $last_a end)}' \
+           > "$CACHE_FILE.tmp" 2>/dev/null; then
+            mv "$CACHE_FILE.tmp" "$CACHE_FILE" 2>/dev/null
+        fi || true
+    fi
 fi
 
 # Final processing with jq
 echo "$fastfetch_json" | jq -r \
   --arg app "$appimg" \
   --arg fedora "$fedora_count" \
-  --arg alpine "$alpine_count" '
+  --arg alpine "$alpine_count" \
+  --arg mode "$MODE" '
   .[0].result as $r |
   if $r == null then empty else
 
@@ -100,12 +108,16 @@ echo "$fastfetch_json" | jq -r \
   ($alpine | tonumber) as $alpineNum |
 
   [
-    (if $nix > 0 then "\($nix) (nix)" else empty end),
-    (if $brew > 0 then "\($brew) (brew)" else empty end),
-    (if $ftpk > 0 then "\($ftpk) (ftpk)" else empty end),
-    (if $appNum > 0 then "\($appNum) (appimg)" else empty end),
-    (if $fedoraNum > 0 then "\($fedoraNum) (db-fdra)" else empty end),
-    (if $alpineNum > 0 then "\($alpineNum) (db-alpn)" else empty end)
+    (if $mode == "all" or $mode == "host" then
+        (if $nix > 0 then "\($nix) (nix)" else empty end),
+        (if $brew > 0 then "\($brew) (brew)" else empty end),
+        (if $ftpk > 0 then "\($ftpk) (ftpk)" else empty end),
+        (if $appNum > 0 then "\($appNum) (appimg)" else empty end)
+    else empty end),
+    (if $mode == "all" or $mode == "distrobox" then
+        (if $fedoraNum > 0 then "\($fedoraNum) (malachite-fedora)" else empty end),
+        (if $alpineNum > 0 then "\($alpineNum) (malachite-alpine)" else empty end)
+    else empty end)
   ] | join(", ")
   end
 ' 2>/dev/null || true
