@@ -64,3 +64,19 @@ modules:
         - rpm-ostree-countme.timer
         - dnf-makecache.timer
         - input-remapper.service
+  - type: dnf
+    remove:
+      packages:
+      # Remove packages that are not needed on a desktop system, like language packs, documentation, and hardware support for devices that are not present.
+        - fcitx5-chinese-addons
+        - fcitx5-mozc
+        - fcitx5-hangul
+        - fcitx5-chewing
+        - ibus-anthy
+        - ibus-pinyin
+        - ibus-hangul
+        - ibus-m17n
+        - anthy-unicode
+        - libthai
+        - libhangul
+      auto-remove: true
