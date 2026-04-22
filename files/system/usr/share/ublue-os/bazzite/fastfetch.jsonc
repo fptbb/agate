@@ -73,7 +73,10 @@
         },
         {
             "type": "disk",
-            "key": " "
+            "key": " ",
+            "showExternal": true,
+            "hideFolders": "/efi:/boot:/boot/efi",
+            "hideFS": "overlay:vfat"
         },
         {
             "type": "display",
