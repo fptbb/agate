@@ -26,7 +26,7 @@ command fastfetch -c none -s packages --format json | jq -r --arg app "$appimg" 
   ) as $rpmFmt |
   
   [
-    (if $rpm > 0 then "\($rpmFmt) (rpm)" else empty end),
+    # (if $rpm > 0 then "\($rpmFmt) (rpm)" else empty end),
     (if $nix > 0 then "\($nix) (nix)" else empty end),
     (if $brew > 0 then "\($brew) (brew)" else empty end),
     (if $ftpk > 0 then "\($ftpk) (ftpk)" else empty end),
