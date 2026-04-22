@@ -79,4 +79,4 @@ modules:
         - anthy-unicode
         - libthai
         - libhangul
-      auto-remove: true
+      auto-remove: false
