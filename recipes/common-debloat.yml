@@ -67,7 +67,7 @@ modules:
   - type: dnf
     remove:
       packages:
-      # Remove packages that are not needed on a desktop system, like language packs, documentation, and hardware support for devices that are not present.
+      # Remove packages that are not needed on a desktop system, like language packs and specific input method engines.
         - fcitx5-chinese-addons
         - fcitx5-mozc
         - fcitx5-hangul
@@ -77,6 +77,20 @@ modules:
         - ibus-hangul
         - ibus-m17n
         - anthy-unicode
-        - libthai
-        - libhangul
+        - ibus-typing-booster
+        - ibus-table-chinese
+        - ibus-table-chinese-cangjie
+        - ibus-table-chinese-quick
+        - orca
+        - speech-dispatcher
+        - brltty
+        - braille-printer-app
+        - dymo-cups-drivers
+        - hplip
+        - hplip-common
+        - glibc-all-langpacks
+        - gawk-all-langpacks
+        - fedora-bookmarks
+        - fedora-chromium-config
+        - fedora-chromium-config-kde
       auto-remove: false
