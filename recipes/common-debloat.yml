@@ -67,8 +67,8 @@ modules:
   - type: dnf
     remove:
       packages:
-      # Remove packages that are not needed on a desktop system, like language packs and specific input method engines.
-      # Note: DO NOT remove libthai or libhangul as they are hard dependencies for pango/text rendering.
+        # --- Language & Input Methods ---
+        # Note: DO NOT remove libthai or libhangul as they are hard dependencies for pango/text rendering.
         - fcitx5-chinese-addons
         - fcitx5-mozc
         - fcitx5-hangul
@@ -82,18 +82,33 @@ modules:
         - ibus-table-chinese
         - ibus-table-chinese-cangjie
         - ibus-table-chinese-quick
+
+        # --- Accessibility ---
         - orca
         - speech-dispatcher
         - brltty
         - braille-printer-app
+
+        # --- Hardware Support (Printers & Drivers) ---
         - dymo-cups-drivers
         - hplip
         - hplip-common
-        - gawk-all-langpacks
-        - fedora-bookmarks
-        - fedora-chromium-config
-        - fedora-chromium-config-kde
-        # Handheld & Deck specific bloat (not needed on Desktop/Laptop)
+        - iwlwifi-mvm-firmware
+        - atheros-firmware
+        - amd-gpu-firmware
+
+        # --- ROCm Stack (AMD GPU Compute - Unused on Nvidia) ---
+        - rocm-llvm-static
+        - rocm-comgr
+        - rocm-clang-libs
+        - rocm-llvm-libs
+        - rocm-clang
+        - rocm-llvm
+        - rocm-llvm-devel
+        - rocm-clang-devel
+        - rocm-hip
+
+        # --- Bazzite Handheld / Deck Components ---
         - gamescope-session-steam
         - gamescope-session-plus
         - jupiter-hw-support-btrfs
@@ -103,7 +118,12 @@ modules:
         - steam_notif_daemon
         - steamdeck-dsp
         - steamdeck-kde-presets
-        # Non-x86 QEMU Emulators (save space, keep x86_64 virtualization)
+
+        # --- Virtualization (Keeping only minimal x86_64 stack) ---
+        - edk2-aarch64
+        - edk2-riscv64
+        - qemu-user
+        - qemu-user-static-aarch64
         - qemu-system-aarch64
         - qemu-system-aarch64-core
         - qemu-system-arm
@@ -139,4 +159,9 @@ modules:
         - qemu-system-xtensa
         - qemu-system-xtensa-core
         - ipxe-roms-qemu
-      auto-remove: false
+
+        # --- Miscellaneous ---
+        - fedora-bookmarks
+        - fedora-chromium-config
+        - fedora-chromium-config-kde
+      auto-remove: true
