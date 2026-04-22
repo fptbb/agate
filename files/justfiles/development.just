@@ -81,3 +81,51 @@ toggle-services action target="all":
     fi
 
     echo "done."
+
+# Malachite Configuration
+# Centralized source of truth is at /usr/share/agate/malachite.json
+malachite_json := "/usr/share/agate/malachite.json"
+malachite_images := if path_exists(malachite_json) { `jq -r '.images[].name' {{ malachite_json }} | xargs` } else { "fedora alpine" }
+malachite_repo := if path_exists(malachite_json) { `jq -r '.repo' {{ malachite_json }}` } else { "quay.io/fptbb/malachite" }
+
+# Create or replace Malachite containers
+[group("malachite")]
+malachite-setup name="":
+    #!/usr/bin/bash
+    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
+    for img in $IMAGES; do
+        echo "Setting up malachite-$img..."
+        distrobox create -i {{ malachite_repo }}:$img -n $img --replace -y
+    done
+
+# Update Malachite images and containers
+[group("malachite")]
+malachite-update name="":
+    #!/usr/bin/bash
+    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
+    for img in $IMAGES; do
+        echo "Updating malachite-$img..."
+        podman pull {{ malachite_repo }}:$img
+        distrobox upgrade $img
+    done
+
+# Re-create Malachite containers (wiping state)
+[group("malachite")]
+malachite-recreate name="":
+    #!/usr/bin/bash
+    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
+    for img in $IMAGES; do
+        echo "Recreating malachite-$img..."
+        distrobox rm -f $img
+        distrobox create -i {{ malachite_repo }}:$img -n $img -y
+    done
+
+# Remove Malachite containers
+[group("malachite")]
+malachite-purge name="":
+    #!/usr/bin/bash
+    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
+    for img in $IMAGES; do
+        echo "Purging malachite-$img..."
+        distrobox rm -f $img
+done

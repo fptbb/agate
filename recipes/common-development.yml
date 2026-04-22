@@ -5,6 +5,7 @@ modules:
   - type: script
     scripts:
       - nix.sh
+      - malachite-setup.sh
   - type: justfiles
     validate: true
     include: # use just --fmt --check --unstable --justfile to validate justfiles

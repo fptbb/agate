@@ -1,35 +1,111 @@
 #!/bin/bash
 
-# gets installed appimages count
-appimg=$(fp-appimage-updater list --json 2>/dev/null | jq '.apps | map(select(.local_version != null)) | length')
+# paths - using /var/lib/agate for persistent state data
+# Note: Directory permissions are managed via /usr/lib/tmpfiles.d/agate.conf
+CACHE_FILE="/var/lib/agate/package-counts.json"
 
-# defaults to 0 if the command fails
-appimg="${appimg:-0}"
+# ensure cache exists with defaults (silently fail if directory doesn't exist)
+if [[ ! -f "$CACHE_FILE" ]]; then
+    if [[ -d "$(dirname "$CACHE_FILE")" ]]; then
+        echo '{"fedora": 0, "alpine": 0}' > "$CACHE_FILE" 2>/dev/null || true
+    fi
+fi
 
-# parses fastfetch raw output, sums package variants, and formats the output string
-command fastfetch -c none -s packages --format json | jq -r --arg app "$appimg" '
+# use a temporary directory for parallel results
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# 1. AppImage count (Background)
+(
+    appimg=$(fp-appimage-updater list --json 2>/dev/null | jq '.apps | map(select(.local_version != null)) | length' 2>/dev/null)
+    echo "${appimg:-0}" > "$TMP_DIR/appimg"
+) &
+
+# 2. Get Podman containers status once (Background)
+(
+    # format: name|status
+    podman ps -a --filter "label=manager=distrobox" --format '{{.Names}}|{{.Status}}' 2>/dev/null > "$TMP_DIR/containers"
+) &
+
+# 3. Fastfetch (Background)
+(
+    command fastfetch -c none -s packages --format json 2>/dev/null > "$TMP_DIR/fastfetch"
+) &
+
+# Wait for container list and fastfetch to be ready
+wait $! 2>/dev/null
+
+# Load last known counts from cache (silently fallback to 0)
+FEDORA_LAST=$(jq -r '.fedora // 0' "$CACHE_FILE" 2>/dev/null || echo 0)
+ALPINE_LAST=$(jq -r '.alpine // 0' "$CACHE_FILE" 2>/dev/null || echo 0)
+
+# Process containers in parallel
+if [[ -f "$TMP_DIR/containers" ]]; then
+    while IFS="|" read -r name status; do
+        if [[ "$name" == "fedora" ]]; then
+            (
+                if [[ "$status" == Up* ]]; then
+                    count=$(podman exec fedora rpm -qa 2>/dev/null | wc -l)
+                    echo "$count" > "$TMP_DIR/fedora_count"
+                else
+                    echo "$FEDORA_LAST" > "$TMP_DIR/fedora_count"
+                fi
+            ) &
+        elif [[ "$name" == "alpine" ]]; then
+            (
+                if [[ "$status" == Up* ]]; then
+                    count=$(podman exec alpine apk info 2>/dev/null | wc -l)
+                    echo "$count" > "$TMP_DIR/alpine_count"
+                else
+                    echo "$ALPINE_LAST" > "$TMP_DIR/alpine_count"
+                fi
+            ) &
+        fi
+    done < "$TMP_DIR/containers"
+fi
+
+# Wait for everything
+wait
+
+# Collect results
+appimg=$(cat "$TMP_DIR/appimg" 2>/dev/null || echo 0)
+fedora_count=$(cat "$TMP_DIR/fedora_count" 2>/dev/null || echo 0)
+alpine_count=$(cat "$TMP_DIR/alpine_count" 2>/dev/null || echo 0)
+fastfetch_json=$(cat "$TMP_DIR/fastfetch" 2>/dev/null || echo "[]")
+
+# Update cache if counts changed and are valid (>0)
+if [[ "$fedora_count" -gt 0 || "$alpine_count" -gt 0 ]]; then
+    # merge new counts into cache (silently skip if directory is not writable)
+    jq -n --arg f "$fedora_count" --arg a "$alpine_count" \
+       --argjson last_f "$FEDORA_LAST" --argjson last_a "$ALPINE_LAST" \
+       '{fedora: (if ($f|tonumber) > 0 then ($f|tonumber) else $last_f end), 
+         alpine: (if ($a|tonumber) > 0 then ($a|tonumber) else $last_a end)}' \
+       2>/dev/null > "$CACHE_FILE.tmp" && mv "$CACHE_FILE.tmp" "$CACHE_FILE" 2>/dev/null || true
+fi
+
+# Final processing with jq
+echo "$fastfetch_json" | jq -r \
+  --arg app "$appimg" \
+  --arg fedora "$fedora_count" \
+  --arg alpine "$alpine_count" '
   .[0].result as $r |
-  
+  if $r == null then empty else
+
   ($r.rpm // 0) as $rpm |
   (($r.nixUser // 0) + ($r.nixDefault // 0) + ($r.nix // 0)) as $nix |
   (($r.brew // 0) + ($r.brewCask // 0)) as $brew |
   (($r.flatpakSystem // 0) + ($r.flatpakUser // 0) + ($r.flatpak // 0)) as $ftpk |
   ($app | tonumber) as $appNum |
-  
-  # formats rpm count to 3,2k format if 1000 or higher
-  (
-    if $rpm >= 1000 then
-      ((($rpm / 100) | round / 10) | tostring | sub("\\."; ",")) + "k"
-    else
-      ($rpm | tostring)
-    end
-  ) as $rpmFmt |
-  
+  ($fedora | tonumber) as $fedoraNum |
+  ($alpine | tonumber) as $alpineNum |
+
   [
-    # (if $rpm > 0 then "\($rpmFmt) (rpm)" else empty end),
     (if $nix > 0 then "\($nix) (nix)" else empty end),
     (if $brew > 0 then "\($brew) (brew)" else empty end),
     (if $ftpk > 0 then "\($ftpk) (ftpk)" else empty end),
-    (if $appNum > 0 then "\($appNum) (appimg)" else empty end)
+    (if $appNum > 0 then "\($appNum) (appimg)" else empty end),
+    (if $fedoraNum > 0 then "\($fedoraNum) (db-fdra)" else empty end),
+    (if $alpineNum > 0 then "\($alpineNum) (db-alpn)" else empty end)
   ] | join(", ")
-'
+  end
+' 2>/dev/null || true

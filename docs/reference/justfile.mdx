@@ -75,6 +75,17 @@ Set up additional development environments.
 | `just agate-nixpkgs` | Install Nix package manager |
 | `just agate-devbox` | Install Devbox for reproducible dev environments |
 
+### Malachite Distrobox
+
+Manage specialized Fedora and Alpine development containers from the [Malachite](https://gitlab.com/fpsys/malachite) project.
+
+| Command | Description |
+|---|---|
+| `just malachite-setup` | Create Fedora and Alpine containers |
+| `just malachite-update` | Pull latest images and upgrade containers |
+| `just malachite-recreate` | Wipe and re-create containers from scratch |
+| `just malachite-purge` | Remove Malachite containers |
+
 ### Security
 
 Configure hardware-backed authentication and disk encryption.

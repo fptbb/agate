@@ -1,0 +1,13 @@
+{
+  "repo": "quay.io/fptbb/malachite",
+  "images": [
+    {
+      "name": "fedora",
+      "pretty_name": "Fedora"
+    },
+    {
+      "name": "alpine",
+      "pretty_name": "Alpine"
+    }
+  ]
+}
