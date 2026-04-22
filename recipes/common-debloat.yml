@@ -68,6 +68,7 @@ modules:
     remove:
       packages:
       # Remove packages that are not needed on a desktop system, like language packs and specific input method engines.
+      # Note: DO NOT remove libthai or libhangul as they are hard dependencies for pango/text rendering.
         - fcitx5-chinese-addons
         - fcitx5-mozc
         - fcitx5-hangul
@@ -92,4 +93,50 @@ modules:
         - fedora-bookmarks
         - fedora-chromium-config
         - fedora-chromium-config-kde
+        # Handheld & Deck specific bloat (not needed on Desktop/Laptop)
+        - gamescope-session-steam
+        - gamescope-session-plus
+        - jupiter-hw-support-btrfs
+        - jupiter-fan-control
+        - hhd
+        - hhd-ui
+        - steam_notif_daemon
+        - steamdeck-dsp
+        - steamdeck-kde-presets
+        # Non-x86 QEMU Emulators (save space, keep x86_64 virtualization)
+        - qemu-system-aarch64
+        - qemu-system-aarch64-core
+        - qemu-system-arm
+        - qemu-system-arm-core
+        - qemu-system-riscv
+        - qemu-system-riscv-core
+        - qemu-system-ppc
+        - qemu-system-ppc-core
+        - qemu-system-s390x
+        - qemu-system-s390x-core
+        - qemu-system-mips
+        - qemu-system-mips-core
+        - qemu-system-alpha
+        - qemu-system-alpha-core
+        - qemu-system-avr
+        - qemu-system-avr-core
+        - qemu-system-loongarch64
+        - qemu-system-loongarch64-core
+        - qemu-system-m68k
+        - qemu-system-m68k-core
+        - qemu-system-microblaze
+        - qemu-system-microblaze-core
+        - qemu-system-or1k
+        - qemu-system-or1k-core
+        - qemu-system-rx
+        - qemu-system-rx-core
+        - qemu-system-sh4
+        - qemu-system-sh4-core
+        - qemu-system-sparc
+        - qemu-system-sparc-core
+        - qemu-system-tricore
+        - qemu-system-tricore-core
+        - qemu-system-xtensa
+        - qemu-system-xtensa-core
+        - ipxe-roms-qemu
       auto-remove: false
