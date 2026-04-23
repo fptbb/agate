@@ -95,3 +95,4 @@ ln -sf /usr/share/pixmaps/fp-logo-le.svg /usr/share/icons/hicolor/scalable/place
 # Remove Deck Mode session entries
 rm -f /usr/share/wayland-sessions/gamescope-session.desktop
 rm -f /usr/share/wayland-sessions/steam-plus.desktop
+rm -f /usr/share/wayland-sessions/plasma-steamos-wayland-oneshot.desktop
