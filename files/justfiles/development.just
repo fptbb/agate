@@ -86,8 +86,8 @@ toggle-services action target="all":
 # Centralized source of truth is at /usr/share/agate/malachite.json
 
 malachite_json := "/usr/share/agate/malachite.json"
-malachite_images := if path_exists(malachite_json) == "true" { `jq -r '.images[].name' {{ malachite_json }} | xargs` } else { "fedora alpine" }
-malachite_repo := if path_exists(malachite_json) == "true" { `jq -r '.repo' {{ malachite_json }}` } else { "quay.io/fptbb/malachite" }
+malachite_images := if path_exists(malachite_json) == "true" { `jq -r '.images[].name' /usr/share/agate/malachite.json | xargs` } else { "fedora alpine" }
+malachite_repo := if path_exists(malachite_json) == "true" { `jq -r '.repo' /usr/share/agate/malachite.json` } else { "quay.io/fptbb/malachite" }
 
 # Create or replace Malachite containers
 [group("malachite")]

@@ -13,3 +13,4 @@ cosign.private
 # Titanoboa local
 titanoboa/
 installer/
+.bluebuild-scripts_*
