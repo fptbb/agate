@@ -1,14 +1,137 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Starting dotfiles sync engine..."
+LOCK_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}"
+LOCK_FILE="$LOCK_DIR/dotfiles-sync.lock"
+CHEZMOI_CONFIG_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml"
+CHEZMOI_RUN_CONFIG="$(mktemp)"
+
+mkdir -p "$LOCK_DIR"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "Another dotfiles sync is already running. Skipping duplicate run."
+    exit 0
+fi
+
+cleanup() {
+    rm -f "$CHEZMOI_RUN_CONFIG"
+}
+trap cleanup EXIT
+
+if [ -f "$CHEZMOI_CONFIG_PATH" ]; then
+    awk '
+        BEGIN {
+            in_git = 0
+            saw_git = 0
+            wrote_git_keys = 0
+        }
+
+        function write_git_keys() {
+            if (!wrote_git_keys) {
+                print "    autoCommit = false"
+                print "    autoPush = false"
+                wrote_git_keys = 1
+            }
+        }
+
+        /^\[git\][[:space:]]*$/ {
+            if (in_git) {
+                write_git_keys()
+            }
+            in_git = 1
+            saw_git = 1
+            wrote_git_keys = 0
+            print
+            next
+        }
+
+        /^\[[^]]+\][[:space:]]*$/ {
+            if (in_git) {
+                write_git_keys()
+                in_git = 0
+            }
+            print
+            next
+        }
+
+        in_git && /^[[:space:]]*autoCommit[[:space:]]*=/ {
+            next
+        }
+
+        in_git && /^[[:space:]]*autoPush[[:space:]]*=/ {
+            next
+        }
+
+        {
+            print
+        }
+
+        END {
+            if (in_git) {
+                write_git_keys()
+            } else if (!saw_git) {
+                print ""
+                print "[git]"
+                print "    autoCommit = false"
+                print "    autoPush = false"
+            }
+        }
+    ' "$CHEZMOI_CONFIG_PATH" > "$CHEZMOI_RUN_CONFIG"
+else
+    cat > "$CHEZMOI_RUN_CONFIG" <<'EOF'
+[git]
+    autoCommit = false
+    autoPush = false
+EOF
+fi
+
+chezmoi_cmd() {
+    chezmoi --config "$CHEZMOI_RUN_CONFIG" --config-format toml "$@"
+}
+
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BLUE=$'\033[1;34m'
+    C_CYAN=$'\033[1;36m'
+    C_GREEN=$'\033[1;32m'
+    C_YELLOW=$'\033[1;33m'
+else
+    C_RESET=""
+    C_BLUE=""
+    C_CYAN=""
+    C_GREEN=""
+    C_YELLOW=""
+fi
+
+log_section() {
+    printf '%b\n' "${C_BLUE}󰆍 $*${C_RESET}"
+}
+
+log_step() {
+    printf '%b\n' "${C_CYAN}  󰧑 $*${C_RESET}"
+}
+
+log_success() {
+    printf '%b\n' "${C_GREEN}   $*${C_RESET}"
+}
+
+log_warn() {
+    printf '%b\n' "${C_YELLOW}   $*${C_RESET}"
+}
+
+log_error() {
+    printf '%b\n' "${C_YELLOW}   $*${C_RESET}"
+}
+
+log_done() {
+    printf '%b\n' "${C_GREEN}󰄬 $*${C_RESET}"
+}
+
+log_section "Starting dotfiles sync engine..."
 
 # Reads paths from environment variables passed by the Justfile
 TRACKED="${DOTFILES_TRACKED:-$HOME/.bin/tracked}"
 TRACKED_ENC="${DOTFILES_TRACKED_ENC:-$HOME/.bin/tracked_encrypted}"
-
-echo "=> Running chezmoi re-add..."
-chezmoi re-add --force
 
 # reads tracking lists into arrays and separates exclusion patterns
 TRACKED_LIST=()
@@ -67,79 +190,192 @@ if [ -f "$TRACKED_ENC" ]; then
     done < "$TRACKED_ENC"
 fi
 
-echo "=> Discovering and evaluating files..."
+ALL_EXCLUDES=(
+    "${EXCLUDE_LIST[@]}"
+    "${ENC_EXCLUDE_LIST[@]}"
+)
+
+log_section "Running chezmoi re-add..."
+
+TO_READD=()
+while IFS= read -r status_line; do
+    if [ -z "$status_line" ]; then
+        continue
+    fi
+
+    target_status="${status_line:1:1}"
+    target_path="${status_line:3}"
+
+    if [ "$target_status" = "M" ] && [ -f "$target_path" ]; then
+        TO_READD+=("$target_path")
+    fi
+done < <(chezmoi_cmd status --include=files --path-style absolute 2>/dev/null || true)
+
+if [ ${#TO_READD[@]} -gt 0 ]; then
+    log_step "Re-adding ${#TO_READD[@]} modified managed file(s)..."
+    chezmoi_cmd re-add --force "${TO_READD[@]}"
+else
+    log_success "No managed files needed re-adding."
+fi
+
+log_section "Discovering and evaluating files..."
+
+# resolves symlinks so alternate path aliases do not look like distinct files
+CANONICALIZER=""
+if command -v realpath >/dev/null 2>&1; then
+    CANONICALIZER="realpath"
+elif command -v readlink >/dev/null 2>&1; then
+    CANONICALIZER="readlink"
+fi
+
+declare -A CANONICAL_CACHE
+canonical_path() {
+    local path="$1"
+    local resolved
+
+    if [[ -n "${CANONICAL_CACHE[$path]+x}" ]]; then
+        printf '%s\n' "${CANONICAL_CACHE[$path]}"
+        return 0
+    fi
+
+    if [ "$CANONICALIZER" = "realpath" ]; then
+        resolved="$(realpath -e "$path" 2>/dev/null)" || resolved="$path"
+    elif [ "$CANONICALIZER" = "readlink" ]; then
+        resolved="$(readlink -f "$path" 2>/dev/null)" || resolved="$path"
+    else
+        resolved="$path"
+    fi
+
+    CANONICAL_CACHE["$path"]="$resolved"
+    printf '%s\n' "$resolved"
+}
+
+expand_pattern_paths() {
+    local pattern="$1"
+
+    mapfile -t expanded_paths < <(compgen -G "$pattern" || true)
+}
+
+path_is_excluded() {
+    local full_path="$1"
+    local ex
+
+    for ex in "${ALL_EXCLUDES[@]}"; do
+        # shellcheck disable=SC2254
+        case "$full_path" in
+            $ex|$ex/*) return 0 ;;
+        esac
+        [[ "$full_path" =~ $ex ]] && return 0
+    done
+
+    return 1
+}
+
+path_is_encrypted() {
+    local full_path="$1"
+    local pat
+
+    for pat in "${ENC_LIST[@]}"; do
+        # shellcheck disable=SC2254
+        case "$full_path" in
+            $pat|$pat/*) return 0 ;;
+        esac
+        [[ "$full_path" =~ $pat ]] && return 0
+    done
+
+    return 1
+}
+
+path_has_valid_prefix() {
+    local full_path="$1"
+    local prefix
+
+    for prefix in "${VALID_PREFIXES[@]}"; do
+        # shellcheck disable=SC2254
+        case "$full_path" in
+            $prefix|$prefix/*) return 0 ;;
+        esac
+        [[ "$full_path" =~ $prefix ]] && return 0
+    done
+
+    return 1
+}
 
 # creates memory map of currently managed files to avoid re-encrypting/re-adding
 declare -A MANAGED_MAP
-mapfile -t managed_list < <(chezmoi managed --include=files 2>/dev/null || true)
+mapfile -d '' -t managed_list < <(chezmoi_cmd managed --include=files --path-style absolute -0 2>/dev/null || true)
 for m in "${managed_list[@]}"; do
-    MANAGED_MAP["$HOME/$m"]=1
+    MANAGED_MAP["$(canonical_path "$m")"]=1
 done
 
 TO_ADD_STD=()
 TO_ADD_ENC=()
-TEMP_FILES=$(mktemp)
+DISCOVERED_FILES=()
+declare -A DISCOVERED_MAP
 
 # enables bash wildcard expansion
 shopt -s nullglob dotglob extglob
-OLD_IFS="$IFS"
 
 for pattern in "${ENC_LIST[@]}" "${TRACKED_LIST[@]}"; do
-    IFS=''
-    expanded_paths=( $pattern )
-    IFS="$OLD_IFS"
+    expand_pattern_paths "$pattern"
 
     for target in "${expanded_paths[@]}"; do
         if [ -d "$target" ]; then
-            find "$target" -type f 2>/dev/null >> "$TEMP_FILES"
+            while IFS= read -r found_path; do
+                if [[ -z "${DISCOVERED_MAP[$found_path]+x}" ]]; then
+                    DISCOVERED_MAP["$found_path"]=1
+                    DISCOVERED_FILES+=("$found_path")
+                fi
+            done < <(find "$target" -type f 2>/dev/null)
         elif [ -f "$target" ]; then
-            echo "$target" >> "$TEMP_FILES"
+            if [[ -z "${DISCOVERED_MAP[$target]+x}" ]]; then
+                DISCOVERED_MAP["$target"]=1
+                DISCOVERED_FILES+=("$target")
+            fi
         fi
     done
 done
 
-while IFS= read -r full_path; do
-    if [[ -n "${MANAGED_MAP[$full_path]}" ]]; then
+for full_path in "${DISCOVERED_FILES[@]}"; do
+    canonical_full_path="$(canonical_path "$full_path")"
+
+    if [[ -n "${MANAGED_MAP[$canonical_full_path]}" ]]; then
         continue
     fi
 
     is_ignored=0
-    for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-        if [[ "$full_path" == $ex ]] || [[ "$full_path" == $ex/* ]] || [[ "$full_path" =~ $ex ]]; then
-            is_ignored=1
-            break
-        fi
-    done
+    if path_is_excluded "$full_path"; then
+        is_ignored=1
+    fi
     if [ $is_ignored -eq 1 ]; then continue; fi
 
     is_enc=0
-    for pat in "${ENC_LIST[@]}"; do
-        if [[ "$full_path" == $pat ]] || [[ "$full_path" == $pat/* ]] || [[ "$full_path" =~ $pat ]]; then
-            is_enc=1
-            break
-        fi
-    done
+    if path_is_encrypted "$full_path"; then
+        is_enc=1
+    fi
 
     if [ $is_enc -eq 1 ]; then
         TO_ADD_ENC+=("$full_path")
     else
         TO_ADD_STD+=("$full_path")
     fi
-done < <(sort -u "$TEMP_FILES")
-
-rm -f "$TEMP_FILES"
+done
 
 if [ ${#TO_ADD_ENC[@]} -gt 0 ]; then
-    echo "  -> Encrypting & Adding ${#TO_ADD_ENC[@]} new file(s)..."
-    chezmoi add --encrypt --force "${TO_ADD_ENC[@]}"
+    log_step "Encrypting & adding ${#TO_ADD_ENC[@]} new file(s)..."
+    chezmoi_cmd add --encrypt --force "${TO_ADD_ENC[@]}"
 fi
 
 if [ ${#TO_ADD_STD[@]} -gt 0 ]; then
-    echo "  -> Adding ${#TO_ADD_STD[@]} new file(s)..."
-    chezmoi add --force "${TO_ADD_STD[@]}"
+    log_step "Adding ${#TO_ADD_STD[@]} new file(s)..."
+    chezmoi_cmd add --force "${TO_ADD_STD[@]}"
 fi
 
-echo "=> Cleaning up orphaned and untracked files..."
+if [ ${#TO_ADD_ENC[@]} -eq 0 ] && [ ${#TO_ADD_STD[@]} -eq 0 ]; then
+    log_success "No new files to add."
+fi
+
+log_section "Cleaning up orphaned and untracked files..."
 
 VALID_PREFIXES=(
     "${TRACKED_LIST[@]}"
@@ -151,30 +387,22 @@ VALID_PREFIXES=(
 
 TO_FORGET=()
 
-for tracked_path in "${managed_list[@]}"; do
-    full_path="$HOME/$tracked_path"
-
+for full_path in "${managed_list[@]}"; do
     if [ ! -e "$full_path" ]; then
         TO_FORGET+=("$full_path")
         continue
     fi
 
     is_ignored=0
-    for ex in "${EXCLUDE_LIST[@]}" "${ENC_EXCLUDE_LIST[@]}"; do
-        if [[ "$full_path" == $ex ]] || [[ "$full_path" == $ex/* ]] || [[ "$full_path" =~ $ex ]]; then
-            is_ignored=1
-            break
-        fi
-    done
+    if path_is_excluded "$full_path"; then
+        is_ignored=1
+    fi
 
     is_valid=0
     if [ $is_ignored -eq 0 ]; then
-        for prefix in "${VALID_PREFIXES[@]}"; do
-            if [[ "$full_path" == $prefix ]] || [[ "$full_path" == $prefix/* ]] || [[ $prefix == "$full_path"/* ]] || [[ "$full_path" =~ $prefix ]]; then
-                is_valid=1
-                break
-            fi
-        done
+        if path_has_valid_prefix "$full_path"; then
+            is_valid=1
+        fi
     fi
 
     if [ $is_valid -eq 0 ] || [ $is_ignored -eq 1 ]; then
@@ -183,37 +411,56 @@ for tracked_path in "${managed_list[@]}"; do
 done
 
 if [ ${#TO_FORGET[@]} -gt 0 ]; then
-    echo "  -> Forgetting ${#TO_FORGET[@]} untracked/excluded file(s)..."
-    chezmoi forget --force "${TO_FORGET[@]}"
+    log_step "Forgetting ${#TO_FORGET[@]} untracked/excluded file(s)..."
+    chezmoi_cmd forget --force "${TO_FORGET[@]}"
+else
+    log_success "No orphaned or excluded files to forget."
 fi
 
-echo "=> Committing and pushing changes..."
+log_section "Committing and pushing changes..."
 
 has_changes=0
-chezmoi git -- diff --quiet 2>/dev/null || has_changes=1
-chezmoi git -- diff --cached --quiet 2>/dev/null || has_changes=1
-if [ -n "$(chezmoi git -- ls-files --others --exclude-standard)" ]; then
+if [ -n "$(chezmoi_cmd git -- status --porcelain 2>/dev/null)" ]; then
     has_changes=1
 fi
 
 if [ "$has_changes" -eq 1 ]; then
-    echo "  -> Staging changes..."
-    chezmoi git -- add .
+    log_step "Staging changes..."
+    chezmoi_cmd git -- add .
 
     has_staged=0
-    chezmoi git -- diff --cached --quiet 2>/dev/null || has_staged=1
+    chezmoi_cmd git -- diff --cached --quiet 2>/dev/null || has_staged=1
 
     if [ "$has_staged" -eq 1 ]; then
-        echo "  -> Creating commit..."
-        chezmoi git -- commit -m "chore: auto-sync dotfiles"
+        branch_name="$(chezmoi_cmd git -- branch --show-current 2>/dev/null)"
+
+        log_step "Creating commit..."
+        if ! commit_output="$(chezmoi_cmd git -- commit --quiet -m "chore: auto-sync dotfiles" 2>&1)"; then
+            [ -n "$commit_output" ] && printf '%s\n' "$commit_output" >&2
+            exit 1
+        fi
+
+        commit_sha="$(chezmoi_cmd git -- rev-parse --short HEAD 2>/dev/null)"
+        commit_subject="$(chezmoi_cmd git -- log -1 --pretty=%s 2>/dev/null)"
+        log_success "Created commit ${commit_sha} ${commit_subject}"
     else
-        echo "  -> No changes staged for commit."
+        log_success "No changes staged for commit."
     fi
 
-    echo "  -> Pushing to remote..."
-    chezmoi git -- push -u origin HEAD
+    if [ "$has_staged" -eq 1 ]; then
+        log_step "Pushing to remote..."
+        if ! push_output="$(chezmoi_cmd git -- push --quiet -u origin HEAD 2>&1)"; then
+            [ -n "$push_output" ] && printf '%s\n' "$push_output" >&2
+            exit 1
+        fi
+
+        if [ -z "$branch_name" ]; then
+            branch_name="HEAD"
+        fi
+        log_success "Pushed ${branch_name} to origin"
+    fi
 else
-    echo "  -> No new changes to commit."
+    log_success "No new changes to commit."
 fi
 
-echo "Sync engine finished."
+log_done "Sync engine finished."
