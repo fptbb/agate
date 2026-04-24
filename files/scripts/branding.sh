@@ -92,7 +92,8 @@ ln -sf /usr/share/pixmaps/fp-logo.svg /usr/share/icons/hicolor/scalable/places/d
 ln -sf /usr/share/pixmaps/fp-logo-white.svg /usr/share/icons/hicolor/scalable/places/bazzite-logo-white.svg
 ln -sf /usr/share/pixmaps/fp-logo-le.svg /usr/share/icons/hicolor/scalable/places/bazzite-logo-le.svg
 
-# Remove Deck Mode session entries
+# Remove Deck Mode and one-shot Plasma session entries
 rm -f /usr/share/wayland-sessions/gamescope-session.desktop
 rm -f /usr/share/wayland-sessions/steam-plus.desktop
 rm -f /usr/share/wayland-sessions/plasma-steamos-wayland-oneshot.desktop
+rm -f /usr/share/xsessions/plasma-steamos-oneshot.desktop
