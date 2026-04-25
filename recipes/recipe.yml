@@ -3,7 +3,7 @@
 name: agate
 description: A custom image of Bazzite for personal needs.
 
-base-image: ghcr.io/ublue-os/bazzite-dx-nvidia
+base-image: ghcr.io/ublue-os/bazzite-nvidia-open
 image-version: latest
 
 modules:
@@ -16,6 +16,7 @@ modules:
   - from-file: common-flatpaks.yml
   - from-file: common-theming.yml
   - from-file: common-development.yml
+  - from-file: common-bazzite-port.yml
   - from-file: common-windowmanager.yml
   - from-file: common-dotfiles.yml
   - from-file: common-debloat.yml

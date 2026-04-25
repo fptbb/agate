@@ -43,27 +43,11 @@ modules:
         - sssd-kcm.service
         # unused storage and package manager daemons
         - lvm2-lvmpolld.socket
-        # local virtual machine hosting suite
-        - libvirtd.service
-        - libvirtd.socket
-        - virtinterfaced.socket
-        - virtlockd.socket
-        - virtlogd.socket
-        - virtlxcd.socket
-        - virtnetworkd.socket
-        - virtnodedevd.socket
-        - virtnwfilterd.socket
-        - virtproxyd.socket
-        - virtqemud.socket
-        - virtsecretd.socket
-        - virtstoraged.socket
-        - virtvboxd.socket
         # others
         - switcheroo-control.service
         - NetworkManager-wait-online.service
         - rpm-ostree-countme.timer
         - dnf-makecache.timer
-        - input-remapper.service
   - type: dnf
     remove:
       packages:

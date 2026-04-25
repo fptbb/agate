@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: dnf
+    repos:
+      files:
+        - docker-ce.repo
+    install:
+      skip-unavailable: true
+      skip-broken: true
+      packages:
+        # Useful desktop and development packages carried over from bazzite-dx.
+        - android-tools
+        - bcc
+        - bpftop
+        - bpftrace
+        - ccache
+        - code
+        - containerd.io
+        - docker-buildx-plugin
+        - docker-ce
+        - docker-ce-cli
+        - docker-compose-plugin
+        - flatpak-builder
+        - git-subtree
+        - guestfs-tools
+        - libvirt
+        - nicstat
+        - numactl
+        - podman-machine
+        - podman-tui
+        - python3-ramalama
+        - qemu
+        - qemu-kvm
+        - restic
+        - rclone
+        - sysprof
+        - tiptop
+        - usbmuxd
+        - virt-manager
+        - waypipe
+        - zsh
+  - type: script
+    scripts:
+      - agate-bazzite-port.sh
+      - agate-opt-fix.sh
+  - type: systemd
+    system:
+      enabled:
+        - agate-dev-groups.service
+        - docker.socket
+        - podman.socket
+        - input-remapper.service
+        - uupd.timer
