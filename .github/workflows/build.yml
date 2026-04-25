@@ -31,13 +31,13 @@ jobs:
             needs-update: ${{ steps.check.outputs.needs_update }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Check if update is needed
               id: check
               shell: bash
               env:
-                  UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
+                  UPSTREAM_IMAGE: "ublue-os/bazzite-nvidia-open"
                   UPSTREAM_REGISTRY: "ghcr.io"
                   IMAGE_NAME: ${{ env.IMAGE_NAME }}
                   REGISTRY: ${{ env.REGISTRY }}
@@ -82,7 +82,7 @@ jobs:
                   maximize_build_space: false
 
             - name: Install ORAS
-              uses: oras-project/setup-oras@v1
+              uses: oras-project/setup-oras@v2
 
             - name: Login to Container Registry
               run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
@@ -105,7 +105,7 @@ jobs:
             packages: write
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Cleanup old tags
               shell: bash
