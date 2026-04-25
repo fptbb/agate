@@ -82,7 +82,7 @@ jobs:
                   maximize_build_space: false
 
             - name: Install ORAS
-              uses: oras-project/setup-oras@v1
+              uses: oras-project/setup-oras@v2
 
             - name: Login to Container Registry
               run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
