@@ -2,6 +2,7 @@ export project_root := `git rev-parse --show-toplevel`
 export git_branch := `git branch --show-current`
 
 # configures payload and iso references
+
 username := "fptbb"
 image_name := "agate"
 image_tag := "latest"
@@ -47,8 +48,8 @@ prepare-titanoboa:
 build-payload:
     #!/usr/bin/env bash
     # requires the local installer directory to exist
-    BASE_IMAGE="{{online_image}}"
-    INSTALL_IMAGE_PAYLOAD="{{online_image}}"
+    BASE_IMAGE="{{ online_image }}"
+    INSTALL_IMAGE_PAYLOAD="{{ online_image }}"
     FLATPAK_DIR_SHORTNAME="kde_flatpaks"
 
     # shares host network to prevent curl timeouts
@@ -59,12 +60,12 @@ build-payload:
         --build-arg BASE_IMAGE="$BASE_IMAGE" \
         --build-arg INSTALL_IMAGE_PAYLOAD="$INSTALL_IMAGE_PAYLOAD" \
         --build-arg FLATPAK_DIR_SHORTNAME="$FLATPAK_DIR_SHORTNAME" \
-        -t {{payload_ref}} ./installer/
+        -t {{ payload_ref }} ./installer/
 
 run-titanoboa:
     #!/usr/bin/env bash
     cd titanoboa
-    
+
     # injects network and privilege flags into podman
     echo '#!/usr/bin/env bash' > podman-wrapper.sh
     echo 'CMD="$1"' >> podman-wrapper.sh
@@ -79,17 +80,17 @@ run-titanoboa:
     # sets selinux to permissive for foreign contexts
     SELINUX_STATE=$(getenforce)
     trap 'if [[ "$SELINUX_STATE" == "Enforcing" ]]; then sudo setenforce 1; fi' EXIT
-    
+
     if [[ "$SELINUX_STATE" == "Enforcing" ]]; then
         sudo setenforce 0
     fi
 
     # bypasses dns timeouts and loop mount limits
-    sudo just PODMAN="$(pwd)/podman-wrapper.sh" build {{payload_ref}} 1 /dev/null
-    mv ./*.iso ../{{iso_dest}} 2>/dev/null || true
+    sudo just PODMAN="$(pwd)/podman-wrapper.sh" build {{ payload_ref }} 1 /dev/null
+    mv ./*.iso ../{{ iso_dest }} 2>/dev/null || true
 
 clean:
     #!/usr/bin/env bash
     sudo rm -rf titanoboa/work
-    sudo podman rmi {{payload_ref}} -f || true
+    sudo podman rmi {{ payload_ref }} -f || true
     sudo podman image prune -f
