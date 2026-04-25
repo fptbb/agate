@@ -30,6 +30,9 @@ jobs:
         outputs:
             needs-update: ${{ steps.check.outputs.needs_update }}
         steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
             - name: Check if update is needed
               id: check
               shell: bash
@@ -101,6 +104,9 @@ jobs:
         permissions:
             packages: write
         steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
             - name: Cleanup old tags
               shell: bash
               env:
