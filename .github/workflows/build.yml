@@ -31,7 +31,7 @@ jobs:
             needs-update: ${{ steps.check.outputs.needs_update }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Check if update is needed
               id: check
@@ -105,7 +105,7 @@ jobs:
             packages: write
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Cleanup old tags
               shell: bash
