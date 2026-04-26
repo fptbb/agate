@@ -5,6 +5,8 @@ description: A custom image of Bazzite for personal needs.
 
 base-image: ghcr.io/ublue-os/bazzite-nvidia-open
 image-version: testing
+alt-tags:
+  - testing
 
 modules:
   - type: files
