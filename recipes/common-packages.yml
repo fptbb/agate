@@ -25,6 +25,7 @@ modules:
         - nordvpn # nordvpn's cli client for linux
         - tailscale # a zero-config vpn and private network tool
         - libpcap # packet capture library for network sniffing tools
+        - dnscrypt-proxy # dnscrypt proxy for encrypted dns queries
 
         # System Utilities & CLI Enhancement
         - kitty # extremely fast, gpu-accelerated terminal emulator
