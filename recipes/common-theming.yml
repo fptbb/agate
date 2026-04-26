@@ -8,9 +8,6 @@ modules:
         - FiraCode
         - FiraMono
         - NerdFontsSymbolsOnly
-  - type: script
-    scripts:
-      - branding.sh
   - type: justfiles
     validate: true
     include:
