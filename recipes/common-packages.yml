@@ -64,12 +64,14 @@ modules:
       # - opensnitch.sh
       - fido2.sh
       - appimage-updater.sh
+      - dnscrypt-proxy.sh
       # - install-protonvpn.sh
   - type: systemd
     system:
       enabled:
         - nordvpnd
         - tailscaled
+        - dnscrypt-proxy
         # - me.proton.vpn.split_tunneling.service
         # - whatpulse-pcap-service
         # - opensnitch
