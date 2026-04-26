@@ -66,6 +66,7 @@ jobs:
             matrix:
                 recipe:
                     - recipe.yml
+                    - recipe-testing.yml
         steps:
             - name: Maximize build space
               uses: ublue-os/container-storage-action@main
