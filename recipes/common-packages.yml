@@ -69,6 +69,9 @@ modules:
       - dnscrypt-proxy.sh
       - install-millennium.sh
       # - install-protonvpn.sh
+  - type: script
+    snippets:
+      - "systemd-sysusers /usr/lib/sysusers.d/tor.conf"
   - type: systemd
     system:
       enabled:
@@ -80,3 +83,4 @@ modules:
         # - opensnitch
       disabled:
         - tor.service
+        - tor-proxy.service
