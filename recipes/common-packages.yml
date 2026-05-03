@@ -26,6 +26,8 @@ modules:
         - tailscale # a zero-config vpn and private network tool
         - libpcap # packet capture library for network sniffing tools
         - dnscrypt-proxy # dnscrypt proxy for encrypted dns queries
+        - tor # anonymity network for secure and private browsing
+        - torsocks # wrapper to force applications to use tor for network connections
 
         # System Utilities & CLI Enhancement
         - kitty # extremely fast, gpu-accelerated terminal emulator
@@ -75,3 +77,5 @@ modules:
         # - me.proton.vpn.split_tunneling.service
         # - whatpulse-pcap-service
         # - opensnitch
+      disabled:
+        - tor.service
