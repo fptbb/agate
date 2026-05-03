@@ -9,10 +9,10 @@ curl -sSL "$DOWNLOAD_URL" -o /tmp/millennium/millennium.tar.gz
 
 tar -xzf /tmp/millennium/millennium.tar.gz -C /tmp/millennium
 
-cp -rP /tmp/millennium/files/usr/* /usr/
+cp -rP /tmp/millennium/usr/* /usr/
 
 mkdir -p /usr/share/millennium-opt
-cp -rP /tmp/millennium/files/opt/* /usr/share/millennium-opt/
+cp -rP /tmp/millennium/opt/* /usr/share/millennium-opt/
 
 # extracts the exact python directory name safely using a bash glob
 for dir in /usr/share/millennium-opt/python-i686*; do
