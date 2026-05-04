@@ -83,4 +83,3 @@ modules:
         # - opensnitch
       disabled:
         - tor.service
-        - tor-proxy.service
