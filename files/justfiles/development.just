@@ -130,3 +130,86 @@ malachite-purge name="":
         echo "Purging malachite-$img..."
         distrobox rm -f $img
     done
+
+toggle-tor:
+    #!/usr/bin/env bash
+
+    # resolves missing user from atomic build process
+    if ! getent passwd toranon > /dev/null; then
+        sudo useradd -r -M -d /var/lib/tor -s /sbin/nologin toranon
+    fi
+
+    # fixes strict unix permissions and selinux contexts required by fedora policy
+    for dir in /var/lib/tor /run/tor /var/log/tor; do
+        if [ ! -d "$dir" ]; then
+            sudo mkdir -p "$dir"
+        fi
+        sudo chown -R toranon:toranon "$dir"
+        sudo chmod 700 "$dir"
+        sudo restorecon -R "$dir" 2>/dev/null || true
+    done
+
+    # overrides fedora selinux confinement to allow tor to bind to proxy ports >1024
+    if command -v getsebool >/dev/null 2>&1; then
+        if [ "$(getsebool tor_bind_all_unreserved_ports | awk '{print $3}')" != "on" ]; then
+            echo "configuring selinux boolean..."
+            sudo setsebool -P tor_bind_all_unreserved_ports 1
+        fi
+    fi
+
+    if sudo nft list table ip tor_proxy >/dev/null 2>&1; then
+        echo "disabling tor transparent proxy..."
+
+        sudo nft delete table ip tor_proxy
+        sudo nft delete table ip6 tor_proxy_v6 2>/dev/null || true
+        sudo systemctl stop tor.service
+
+        echo "tor proxy disabled."
+    else
+        echo "enabling tor transparent proxy..."
+
+        sudo systemctl start tor.service
+
+        # injects high-priority tables redirecting to custom ports 9052 and 9053
+        sudo nft -f - <<< '
+        table ip tor_proxy {
+            chain nat_output {
+                type nat hook output priority -105; policy accept;
+
+                # allows tor daemon to bypass the proxy
+                meta skuid "toranon" accept
+
+                # intercepts all dns before loopback exemption to bypass systemd-resolved
+                udp dport 53 redirect to :9053
+                tcp dport 53 redirect to :9053
+
+                # exempts loopback and local network subnets from tor routing
+                oifname "lo" accept
+                ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
+
+                # redirects all remaining external tcp traffic to tor
+                tcp dport != 22 redirect to :9052
+            }
+            chain filter_output {
+                type filter hook output priority -5; policy drop;
+
+                # allows tor daemon outbound connections
+                meta skuid "toranon" accept
+
+                # allows local network egress
+                oifname "lo" accept
+                ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
+
+                # allows active tcp streams to continue
+                ct state established,related accept
+            }
+        }
+        table ip6 tor_proxy_v6 {
+            chain filter_output {
+                type filter hook output priority -5; policy drop;
+                oifname "lo" accept
+            }
+        }'
+
+        echo "tor proxy active."
+    fi
