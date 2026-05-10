@@ -17,7 +17,7 @@ Agate is a Fedora Bazzite-based atomic image built with [BlueBuild](https://blue
 
 ## What It Does
 
-*   Starts from `ghcr.io/ublue-os/bazzite-dx-nvidia:latest`.
+*   Starts from `ghcr.io/ublue-os/bazzite-nvidia-open:latest`.
 *   Keeps the system atomic and rollback-friendly.
 *   Adds personal branding, wallpapers, icons, cursors, and KDE tweaks.
 *   Enables services and tools I use often, including `nordvpnd`, `tailscaled`, `netbird`, `podman.socket`, `opensnitch`, and `whatpulse`.
@@ -44,6 +44,8 @@ The helper `files/justfiles/*.just` files add system-specific tasks:
 *   `agate-spicetify` - patch Spotify and install Spicetify Marketplace.
 *   `agate-luks-setup` and `agate-luks-remove` - manage YubiKey-backed LUKS.
 *   `agate-kde-setup` - configure KDE YubiKey authentication.
+
+And many more...
 
 ## How to Use
 
@@ -105,6 +107,8 @@ This project is made possible by the work of the open-source community. Special 
 *   The [Universal Blue](https://universal-blue.org/) project and all its contributors.
 *   The [BlueBuild](https://blue-build.org/) project and all its contributors.
 *   Inspiration from other custom OS projects like [VeneOS](https://github.com/Venefilyn/veneos), [amyos](https://github.com/astrovm/amyos), and [m2os](https://github.com/m2Giles/m2os).
+* And **this community**:
+    ![Billions Must KDE](docs/bmk.png)
 
 ## License
 
