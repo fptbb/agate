@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-set -ouex pipefail
+set ${SET_X:+-x} -eou pipefail
+trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
+log() {
+    echo "=== $* ==="
+}
 
-echo "Configuring DankLinux (DMS) for Niri Wayland Session..."
+log "Configuring DankLinux (DMS) for Niri Wayland Session..."
 
 # links the user services to start when niri starts
 mkdir -p /usr/lib/systemd/user/niri.service.wants
@@ -20,10 +24,10 @@ org.freedesktop.impl.portal.Screenshot=wlr;
 org.freedesktop.impl.portal.RemoteDesktop=wlr;
 EOF
 
-echo "Portal configuration updated successfully."
+log "Portal configuration updated successfully."
 
 # filters out kde background apps from launching in niri
-echo "Patching KDE autostart entries to ignore Niri..."
+log "Patching KDE autostart entries to ignore Niri..."
 for app in /usr/share/autostart/*.desktop /etc/xdg/autostart/*.desktop; do
     if [ -f "$app" ]; then
         # safely skips the essential kde authentication and wallet services
@@ -65,9 +69,9 @@ NIRI_DESKTOP="/usr/share/wayland-sessions/niri.desktop"
 # updates the desktop entry to use the new wrapper script
 if [ -f "$NIRI_DESKTOP" ]; then
     sed -i 's|^Exec=.*|Exec=/usr/bin/start-niri-agate|' "$NIRI_DESKTOP"
-    echo "Niri desktop file updated successfully."
+    log "Niri desktop file updated successfully."
 else
-    echo "Niri desktop file not found at $NIRI_DESKTOP"
+    log "Niri desktop file not found at $NIRI_DESKTOP"
 fi
 
-echo "NIRI CONFIG DONE"
+log "NIRI CONFIG DONE"

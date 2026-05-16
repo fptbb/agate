@@ -1,11 +1,8 @@
-#!/usr/bin/bash
-
+#!/usr/bin/env bash
 set ${SET_X:+-x} -eou pipefail
-
 trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
-
 log() {
-  echo "=== $* ==="
+    echo "=== $* ==="
 }
 
 log "Fetching and installing OpenSnitch."
@@ -22,11 +19,11 @@ get_github_asset_url() {
         '.assets[] | select(.name | test($regex)) | .browser_download_url' | head -n 1)
 
     if [[ -z "${download_url}" || "${download_url}" == "null" ]]; then
-        echo "Error: No asset found matching '${pattern}' in '${repo}'" >&2
+        log "Error: No asset found matching '${pattern}' in '${repo}'"
         return 1
     fi
 
-    echo "${download_url}"
+    log "Found asset for ${repo}: ${download_url}"
 }
 
 # fetches the daemon
@@ -35,7 +32,7 @@ DAEMON_URL=$(get_github_asset_url "evilsocket/opensnitch" "^opensnitch-[0-9].*\.
 # fetches the ui
 UI_URL=$(get_github_asset_url "evilsocket/opensnitch" "^opensnitch-ui-.*\.noarch\.rpm$") || exit 1
 
-echo "Installing OpenSnitch... $DAEMON_URL $UI_URL"
+log "Installing OpenSnitch... $DAEMON_URL $UI_URL"
 # installs directly from url to avoid temp files
 dnf5 install -y "${UI_URL}" python3-grpcio python3-protobuf python3-slugify python3-qt5 libnetfilter_queue info
 

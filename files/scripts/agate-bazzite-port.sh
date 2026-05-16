@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-set -ouex pipefail
+set ${SET_X:+-x} -eou pipefail
+trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
+log() {
+    echo "=== $* ==="
+}
 
 # Keep the x86_64 virtualization stack without dragging the full multi-arch
 # emulation set back in. common-debloat.yml removes the extra qemu targets.

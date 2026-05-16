@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-set -ouex pipefail
+set ${SET_X:+-x} -eou pipefail
+trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
+log() {
+    echo "=== $* ==="
+}
 
 RELEASE_TAG=$(curl -s "https://api.github.com/repos/SteamClientHomebrew/Millennium/releases/latest" | jq -r '.tag_name')
 DOWNLOAD_URL="https://github.com/SteamClientHomebrew/Millennium/releases/download/${RELEASE_TAG}/millennium-${RELEASE_TAG}-linux-x86_64.tar.gz"

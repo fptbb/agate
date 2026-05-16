@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-
-set -euo pipefail
+set ${SET_X:+-x} -eou pipefail
+trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
+log() {
+    echo "=== $* ==="
+}
 
 CONFIG="/usr/share/agate/malachite.json"
 
@@ -16,7 +19,7 @@ echo "Generating Malachite Desktop Launchers..."
 for img in $IMAGES; do
     NAME=$(echo "$img" | jq -r '.name')
     PRETTY=$(echo "$img" | jq -r '.pretty_name')
-    
+
     cat <<DESK > "/usr/share/applications/malachite-$NAME.desktop"
 [Desktop Entry]
 Name=Malachite $PRETTY
