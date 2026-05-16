@@ -22,7 +22,7 @@ repo_gpgcheck=1
 EOF
 
 # imports the gpg key to allow local validation
-sudo dnf config-manager addrepo --from-repofile=/etc/yum.repos.d/netbird.repo
+rpm --import https://pkgs.netbird.io/yum/repodata/repomd.xml.key
 
 # installs the packages while blocking the failing post-transaction systemd hooks
 dnf install -y --setopt=tsflags=noscripts netbird netbird-ui
