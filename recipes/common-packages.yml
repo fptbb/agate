@@ -13,7 +13,6 @@ modules:
         - tailscale.repo
         - cloudflare-warp.repo
         - vscode.repo
-        - netbird.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
         - https://pkg.cloudflareclient.com/pubkey.gpg
@@ -29,8 +28,6 @@ modules:
         - dnscrypt-proxy # dnscrypt proxy for encrypted dns queries
         - tor # anonymity network for secure and private browsing
         - torsocks # wrapper to force applications to use tor for network connections
-        - netbird # zero-config vpn and private network tool with a focus on security and performance
-        - netbird-ui # netbird's gui client for linux
 
         # System Utilities & CLI Enhancement
         - kitty # extremely fast, gpu-accelerated terminal emulator
@@ -71,6 +68,7 @@ modules:
       - appimage-updater.sh
       - dnscrypt-proxy.sh
       - install-millennium.sh
+      - install-netbird.sh
       # - install-protonvpn.sh
   - type: script
     snippets:
@@ -81,6 +79,7 @@ modules:
         - nordvpnd
         - tailscaled
         - dnscrypt-proxy
+        - netbird
         # - me.proton.vpn.split_tunneling.service
         # - whatpulse-pcap-service
         # - opensnitch
