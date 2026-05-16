@@ -79,7 +79,6 @@ modules:
         - nordvpnd
         - tailscaled
         - dnscrypt-proxy
-        - netbird
         # - me.proton.vpn.split_tunneling.service
         # - whatpulse-pcap-service
         # - opensnitch
