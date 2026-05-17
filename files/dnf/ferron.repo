@@ -1,0 +1,6 @@
+[ferron]
+name=Ferron RPM repository
+baseurl=https://rpm.ferron.sh/packages
+enabled=1
+gpgcheck=1
+gpgkey=http://rpm.ferron.sh/signing.pgp

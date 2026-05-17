@@ -13,10 +13,12 @@ modules:
         - tailscale.repo
         - cloudflare-warp.repo
         - vscode.repo
+        - ferron.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
         - https://pkg.cloudflareclient.com/pubkey.gpg
         - https://packages.microsoft.com/keys/microsoft.asc
+        - http://rpm.ferron.sh/signing.pgp
     install:
       skip-unavailable: true
       skip-broken: true
@@ -28,6 +30,7 @@ modules:
         - dnscrypt-proxy # dnscrypt proxy for encrypted dns queries
         - tor # anonymity network for secure and private browsing
         - torsocks # wrapper to force applications to use tor for network connections
+        - ferron # Web Server in Rust
 
         # System Utilities & CLI Enhancement
         - kitty # extremely fast, gpu-accelerated terminal emulator
