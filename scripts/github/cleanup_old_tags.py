@@ -27,7 +27,7 @@ class GitHubPackageCleaner:
     def run(self):
         max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
         max_keep = int(os.environ.get("MAX_KEEP", 5))
-        protected_tags = ["latest", "latest-cache"]
+        protected_tags = ["latest", "latest-cache", "testing", "testing-cache"]
 
         logger.info(f"Scanning package {self.image_name}...")
         versions = self.client.get_all_versions()

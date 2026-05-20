@@ -29,6 +29,7 @@ jobs:
             packages: read
         outputs:
             needs-update: ${{ steps.check.outputs.needs_update }}
+            recipes: ${{ steps.check.outputs.recipes }}
         steps:
             - name: Checkout repository
               uses: actions/checkout@v6
@@ -55,7 +56,7 @@ jobs:
         # use always() to ensure it runs even if check-update is skipped.
         if: |
             always() && 
-            (needs.check-update.result == 'skipped' || needs.check-update.outputs.needs-update == 'true')
+            (needs.check-update.result == 'skipped' || (needs.check-update.outputs.needs-update == 'true' && needs.check-update.outputs.recipes != '[]'))
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -64,9 +65,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                recipe:
-                    - recipe.yml
-                    - recipe-testing.yml
+                recipe: ${{ fromJson(needs.check-update.outputs.recipes || '["recipe.yml", "recipe-testing.yml"]') }}
         steps:
             - name: Maximize build space
               uses: ublue-os/container-storage-action@main
