@@ -50,13 +50,12 @@ modules:
         - fp-appimage-updater # declarative appimage updater
         - upx # ultimate packer for executables (binary compressor)
 
+        # Windows Compatibility & Gaming
+        - gameconqueror # cheat engine for linux (debug and memory edit)
+
         # Storage & File Management
         - kde-partitionmanager # gui tool to manage disk partitions
         - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images
-        - nextcloud-client-dolphin # the nextcloud desktop client dolphin extension
-
-        # Windows Compatibility & Gaming
-        - gameconqueror # cheat engine for linux (debug and memory edit)
 
         # Dotfiles, Automation & Secrets
         - chezmoi # manage your dotfiles across multiple machines
@@ -65,13 +64,13 @@ modules:
         - rbw # bitwarden cli client for managing secrets in the terminal
   - type: script
     scripts:
-      # - whatpulse.sh
-      # - opensnitch.sh
       - fido2.sh
       - appimage-updater.sh
       - dnscrypt-proxy.sh
-      - install-millennium.sh
       - install-netbird.sh
+      # - whatpulse.sh
+      # - opensnitch.sh
+      # - install-millennium.sh
       # - install-protonvpn.sh
   - type: script
     snippets:
