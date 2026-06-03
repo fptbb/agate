@@ -83,7 +83,6 @@ modules:
   - type: systemd
     system:
       enabled:
-        - fp-no-dash
         - nordvpnd
         - tailscaled
         - dnscrypt-proxy
