@@ -83,8 +83,6 @@ modules:
   - type: systemd
     system:
       enabled:
-        - fp-appimage-updater.timer
-        - fp-dotfiles-manager.timer
         - fp-no-dash.service
         - nordvpnd
         - tailscaled
