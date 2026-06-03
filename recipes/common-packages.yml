@@ -24,6 +24,11 @@ modules:
       skip-unavailable: true
       skip-broken: true
       packages:
+        # Own Packages
+        - fp-appimage-updater # declarative appimage updater
+        - fp-dotfiles-manager # manage dotfiles with style
+        - fp-no-dash # personal web dashboard and launcher
+
         # Networking & VPNs
         - nordvpn # nordvpn's cli client for linux
         - tailscale # a zero-config vpn and private network tool
@@ -48,8 +53,6 @@ modules:
 
         # Development & Image Management
         - buildah # build oci/docker images without needing a daemon
-        - fp-appimage-updater # declarative appimage updater
-        - fp-dotfiles-manager # manage dotfiles with style
         - upx # ultimate packer for executables (binary compressor)
 
         # Windows Compatibility & Gaming
@@ -80,6 +83,9 @@ modules:
   - type: systemd
     system:
       enabled:
+        - fp-appimage-updater.timer
+        - fp-dotfiles-manager.timer
+        - fp-no-dash.service
         - nordvpnd
         - tailscaled
         - dnscrypt-proxy
