@@ -5,8 +5,9 @@ modules:
     repos:
       cleanup: true
       copr:
-        - bigjapka/VeraCrypt
+        - fptbb/packages
         - fptbb/fp-appimage-updater
+        - bigjapka/VeraCrypt
         - komapro/rbw
       files:
         - nordvpn.repo
@@ -48,6 +49,7 @@ modules:
         # Development & Image Management
         - buildah # build oci/docker images without needing a daemon
         - fp-appimage-updater # declarative appimage updater
+        - fp-dotfiles-manager # manage dotfiles with style
         - upx # ultimate packer for executables (binary compressor)
 
         # Windows Compatibility & Gaming
