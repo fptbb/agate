@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+# Kargs, Initramfs and Signing
+
+modules:
+  
+  - type: kargs
+    arch: x86_64
+    kargs:
+      # Temporary workaround for NVIDIA GPU users until we find a better solution https://www.answeroverflow.com/m/1512703752942129263
+      - nvidia_drm.color_pipeline=0
+  - type: initramfs
+  - type: signing

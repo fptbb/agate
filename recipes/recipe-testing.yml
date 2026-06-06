@@ -37,13 +37,8 @@ modules:
     scripts:
       - branding-testing.sh
 
-  # Kargs, Initramfs and Signing
-  - type: kargs
-    arch: x86_64, aarch64
-    kargs:
-      - nvidia_drm.color_pipeline=0
-  - type: initramfs
-  - type: signing
+  # Obligatory Common Modules, do not remove.
+  - from-file: common.yml
 
 labels:
   "org.opencontainers.image.title": "Agate - Testing"
