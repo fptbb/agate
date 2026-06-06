@@ -37,7 +37,11 @@ modules:
     scripts:
       - branding-testing.sh
 
-  # Initramfs and Signing
+  # Kargs, Initramfs and Signing
+  - type: kargs
+    arch: x86_64, aarch64
+    kargs:
+      - nvidia_drm.color_pipeline=0
   - type: initramfs
   - type: signing
 
