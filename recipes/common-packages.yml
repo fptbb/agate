@@ -41,6 +41,7 @@ modules:
         # System Utilities & CLI Enhancement
         - kitty # extremely fast, gpu-accelerated terminal emulator
         - powerline-fonts # patched fonts with powerline symbols
+        - plasma-drkonqi # plasma crash handler for debugging applications
 
         # Security & Authentication
         - pam-u2f # yubikey and fido u2f authentication for pam
