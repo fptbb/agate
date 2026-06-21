@@ -1,5 +1,6 @@
 {
   "repo": "quay.io/fptbb/malachite",
+  "link": "https://malachite.fpt.icu/",
   "images": [
     {
       "name": "fedora",

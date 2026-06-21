@@ -13,7 +13,7 @@ agate-devbox:
 # toggles specific background services mapped in ~/bin/sys/services.conf
 [group("system")]
 toggle-services action target="all":
-    #!/usr/bin/env bash
+    #!/usr/bin/bash
     set -euo pipefail
     CONFIG_FILE="$HOME/.bin/sys/services.conf"
     declare -A SERVICES
@@ -83,56 +83,136 @@ toggle-services action target="all":
     echo "done."
 
 # Malachite Configuration
-# Centralized source of truth is at /usr/share/agate/malachite.json
-
 malachite_json := "/usr/share/agate/malachite.json"
+
 malachite_images := if path_exists(malachite_json) == "true" { `jq -r '.images[].name' /usr/share/agate/malachite.json | xargs` } else { "fedora alpine" }
 malachite_repo := if path_exists(malachite_json) == "true" { `jq -r '.repo' /usr/share/agate/malachite.json` } else { "quay.io/fptbb/malachite" }
+malachite_link := if path_exists(malachite_json) == "true" { `jq -r '.link' /usr/share/agate/malachite.json` } else { "https://malachite.fpt.icu/" }
 
-# Create or replace Malachite containers
-[group("malachite")]
-malachite-setup name="":
+# Execute Malachite operations
+[group("system")]
+malachite action="" image="":
     #!/usr/bin/bash
-    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
+    ACTION="{{ action }}"
+    IMAGES="{{ if image == "" { malachite_images } else { image } }}"
+
+    # prints usage instructions and available commands when executed without arguments
+    if [ -z "$ACTION" ]; then
+        echo "Usage: ujust malachite <action> [image]"
+        echo ""
+        echo "Available actions:"
+        echo "  apply   - Replaces and assembles containers from remote .ini configurations"
+        echo "  update  - Pulls the latest base image and runs distrobox upgrade"
+        echo "  purge   - Forcefully removes the containers"
+        echo ""
+        echo "If [image] is omitted, actions are applied to: $IMAGES"
+        exit 0
+    fi
+
     for img in $IMAGES; do
-        echo "Setting up malachite-$img..."
-        distrobox create -i {{ malachite_repo }}:$img -n $img --replace -y
+        # routes the requested action to the corresponding distrobox operation
+        case $ACTION in
+            apply)
+                echo "Applying configuration for malachite-$img..."
+                distrobox assemble create --replace --file "{{ malachite_link }}$img.ini"
+                ;;
+            update)
+                echo "Updating malachite-$img..."
+                podman pull {{ malachite_repo }}:$img
+                distrobox upgrade $img
+                ;;
+            purge)
+                echo "Purging malachite-$img..."
+                distrobox rm -f $img
+                ;;
+            *)
+                echo "Error: Invalid action '$ACTION'."
+                echo "Valid actions are: apply, update, purge"
+                exit 1
+                ;;
+        esac
     done
 
-# Update Malachite images and containers
-[group("malachite")]
-malachite-update name="":
+# Container Cleanup (Podman/Docker)
+[group("system")]
+container action="":
     #!/usr/bin/bash
-    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
-    for img in $IMAGES; do
-        echo "Updating malachite-$img..."
-        podman pull {{ malachite_repo }}:$img
-        distrobox upgrade $img
-    done
+    ACTION="{{ action }}"
 
-# Re-create Malachite containers (wiping state)
-[group("malachite")]
-malachite-recreate name="":
-    #!/usr/bin/bash
-    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
-    for img in $IMAGES; do
-        echo "Recreating malachite-$img..."
-        distrobox rm -f $img
-        distrobox create -i {{ malachite_repo }}:$img -n $img -y
-    done
+    if [ -z "$ACTION" ]; then
+        echo "Usage: ujust container <action>"
+        echo ""
+        echo "Available actions:"
+        echo "  list  - Lists all containers, images, and volumes"
+        echo "  stop  - Stops all running containers"
+        echo "  clear - Removes unused containers, networks, images, and volumes"
+        echo "  purge - Forcefully stops and removes ALL containers, images, and volumes"
+        exit 0
+    fi
 
-# Remove Malachite containers
-[group("malachite")]
-malachite-purge name="":
-    #!/usr/bin/bash
-    IMAGES="{{ if name == "" { malachite_images } else { name } }}"
-    for img in $IMAGES; do
-        echo "Purging malachite-$img..."
-        distrobox rm -f $img
-    done
+    # runs operations universally across available container engines
+    run_engine() {
+        local cmd=$1
+        if command -v podman &> /dev/null; then
+            echo "[Podman]"
+            eval "podman $cmd" || true
+        fi
+        if command -v docker &> /dev/null; then
+            echo "[Docker]"
+            eval "docker $cmd" || true
+        fi
+    }
+
+    case $ACTION in
+        list)
+            echo "Listing all containers, images, and volumes..."
+            run_engine "ps -a"
+            run_engine "images"
+            run_engine "volume ls"
+            ;;
+        stop)
+            echo "Stopping all running containers..."
+            if command -v podman &> /dev/null; then podman stop -a || true; fi
+            if command -v docker &> /dev/null; then
+                DOCKER_PIDS=$(docker ps -q)
+                if [ -n "$DOCKER_PIDS" ]; then docker stop $DOCKER_PIDS || true; fi
+            fi
+            ;;
+        clear)
+            echo "Clearing unused resources..."
+            run_engine "system prune -f"
+            ;;
+        purge)
+            echo "Purging ALL containers, images, and volumes..."
+            if command -v podman &> /dev/null; then
+                podman stop -a || true
+                podman rm -fa || true
+                podman rmi -fa || true
+                podman system prune -a -f --volumes || true
+            fi
+            if command -v docker &> /dev/null; then
+                # prevents bash errors if docker queries return empty strings
+                DOCKER_ALL=$(docker ps -aq)
+                if [ -n "$DOCKER_ALL" ]; then
+                    docker stop $DOCKER_ALL || true
+                    docker rm -f $DOCKER_ALL || true
+                fi
+
+                DOCKER_IMG=$(docker images -aq)
+                if [ -n "$DOCKER_IMG" ]; then docker rmi -f $DOCKER_IMG || true; fi
+
+                docker system prune -a -f --volumes || true
+            fi
+            ;;
+        *)
+            echo "Error: Invalid action '$ACTION'."
+            echo "Valid actions are: list, stop, clear, purge"
+            exit 1
+            ;;
+    esac
 
 toggle-tor:
-    #!/usr/bin/env bash
+    #!/usr/bin/bash
 
     # resolves missing user from atomic build process
     if ! getent passwd toranon > /dev/null; then

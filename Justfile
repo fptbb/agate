@@ -94,3 +94,8 @@ clean:
     sudo rm -rf titanoboa/work
     sudo podman rmi {{ payload_ref }} -f || true
     sudo podman image prune -f
+
+format-justfiles:
+    #!/usr/bin/bash
+    just --fmt --unstable ./files/justfiles/
+    echo "Justfiles formatted."
