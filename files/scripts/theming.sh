@@ -36,3 +36,5 @@ rm -f "${wallpapers[@]/#/$base_dir}"
 
 ln -sf /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl /usr/share/backgrounds/default.jxl
 ln -sf /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl /usr/share/backgrounds/default-dark.jxl
+ln -sf /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl /usr/share/wallpapers/convergence.jxl
+ln -sf /usr/share/wallpapers/fox.png /usr/share/wallpapers/convergence.png
