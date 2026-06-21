@@ -12,3 +12,6 @@ modules:
     validate: true
     include:
       - themes.just
+  - type: script@v2
+    scripts:
+      - theming.sh
