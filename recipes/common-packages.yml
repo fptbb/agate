@@ -43,6 +43,9 @@ modules:
         - powerline-fonts # patched fonts with powerline symbols
         - plasma-drkonqi # plasma crash handler for debugging applications
 
+        # KDE Related
+        - plasma-union
+
         # Security & Authentication
         - pam-u2f # yubikey and fido u2f authentication for pam
         - libfido2 # fido2 library for u2f support in browsers and other applications
