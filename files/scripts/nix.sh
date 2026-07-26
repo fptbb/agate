@@ -3,8 +3,8 @@ set ${SET_X:+-x} -eou pipefail
 trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
 log() { echo "=== $* ==="; }
 
-log "Installing Nix package"
-dnf install -y nix
+log "Installing Nix packages"
+dnf install -y nix nix-daemon
 
 log "Writing default nix.conf"
 cat > /etc/nix/nix.conf <<'EOF'
@@ -55,19 +55,12 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 
-log "Writing nix-daemon.service unit"
-cat > /usr/lib/systemd/system/nix-daemon.service <<'EOF'
+log "Overriding nix-daemon.service to wait on our store-init unit"
+mkdir -p /usr/lib/systemd/system/nix-daemon.service.d
+cat > /usr/lib/systemd/system/nix-daemon.service.d/10-wait-for-store-init.conf <<'EOF'
 [Unit]
-Description=Nix Daemon
 After=nix-store-init.service
 Requires=nix-store-init.service
-
-[Service]
-ExecStart=/usr/bin/nix daemon
-KillMode=process
-
-[Install]
-WantedBy=multi-user.target
 EOF
 
 log "Enabling nix.mount"
