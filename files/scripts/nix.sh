@@ -6,11 +6,9 @@ log() { echo "=== $* ==="; }
 log "Installing Nix package"
 dnf install -y nix
 
-log "Creating nixbld build users/group"
-groupadd -r nixbld || true
-for i in $(seq 1 32); do
-	useradd -r -g nixbld -G nixbld -d /var/empty -s /usr/sbin/nologin -c "Nix build user $i" "nixbld$i" || true
-done
+log "Debug: listing nix-related systemd units actually installed"
+rpm -ql nix nix-core nix-system nix-filesystem 2>&1 | grep -i systemd || true
+ls -la /usr/lib/systemd/system/ | grep -i nix || true
 
 log "Writing default nix.conf"
 cat > /etc/nix/nix.conf <<'EOF'
@@ -61,8 +59,14 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 
-log "Enabling systemd units (do not use --now during image build)"
-systemctl enable nix.mount nix-store-init.service nix-daemon.service
+log "Enabling nix.mount"
+systemctl enable nix.mount
+
+log "Enabling nix-store-init.service"
+systemctl enable nix-store-init.service
+
+log "Enabling nix-daemon.service"
+systemctl enable nix-daemon.service
 
 ## Old installation method (commented out) for reference
 # mkdir -p /nix && \
