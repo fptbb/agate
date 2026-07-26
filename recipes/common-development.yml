@@ -4,7 +4,7 @@
 modules:
   - type: script
     scripts:
-      - nix.sh
+      # - nix.sh
       - malachite-setup.sh
   - type: justfiles
     validate: true
