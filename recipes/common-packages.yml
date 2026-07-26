@@ -56,7 +56,7 @@ modules:
         - kleopatra # gpg key manager and certificate manager
 
         # Development & Image Management
-        - nix # package manager for reproducible builds and development environments
+        # - nix # package manager for reproducible builds and development environments
         - buildah # build oci/docker images without needing a daemon
         - upx # ultimate packer for executables (binary compressor)
 
@@ -88,7 +88,7 @@ modules:
   - type: systemd
     system:
       enabled:
-        - nix-daemon
+        # - nix-daemon
         - nordvpnd
         - tailscaled
         - dnscrypt-proxy
