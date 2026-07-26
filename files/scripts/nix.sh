@@ -11,4 +11,4 @@ mkdir -p /nix && \
 	curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix -o /nix/determinate-nix-installer.sh && \
 	chmod a+rx /nix/determinate-nix-installer.sh
 
-echo "trusted-users = root fptbb" | sudo tee -a /etc/nix/nix.custom.conf
+echo "trusted-users = root fptbb" | tee -a /etc/nix/nix.custom.conf
