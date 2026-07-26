@@ -6,9 +6,16 @@ log() { echo "=== $* ==="; }
 log "Installing Nix package"
 dnf install -y nix
 
-log "Debug: listing nix-related systemd units actually installed"
-rpm -ql nix nix-core nix-system nix-filesystem 2>&1 | grep -i systemd || true
-ls -la /usr/lib/systemd/system/ | grep -i nix || true
+log "Debug: find nix-daemon.service in any installed package"
+rpm -qa 'nix*' | while read -r pkg; do
+	echo "--- $pkg ---"
+	rpm -ql "$pkg" | grep -i systemd || true
+done
+
+log "Debug: search whole system for relevant unit files"
+find / -xdev -iname 'nix-daemon*' 2>/dev/null
+find / -xdev -iname 'nix.mount' 2>/dev/null
+find / -xdev -iname 'nix.socket' 2>/dev/null
 
 log "Writing default nix.conf"
 cat > /etc/nix/nix.conf <<'EOF'
@@ -54,6 +61,21 @@ ConditionPathExists=!/nix/store
 Type=oneshot
 ExecStart=/usr/bin/nix-store --init
 RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+log "Writing nix-daemon.service unit"
+cat > /usr/lib/systemd/system/nix-daemon.service <<'EOF'
+[Unit]
+Description=Nix Daemon
+After=nix-store-init.service
+Requires=nix-store-init.service
+
+[Service]
+ExecStart=/usr/bin/nix-daemon
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
