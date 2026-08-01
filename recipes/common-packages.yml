@@ -39,7 +39,6 @@ modules:
         - ferron # Web Server in Rust
 
         # System Utilities & CLI Enhancement
-        - kitty # extremely fast, gpu-accelerated terminal emulator
         - powerline-fonts # patched fonts with powerline symbols
         - plasma-drkonqi # plasma crash handler for debugging applications
 
