@@ -4,7 +4,7 @@ trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BA
 log() { echo "=== $* ==="; }
 
 log "Installing Nix packages"
-dnf install -y nix nix-daemon
+dnf install -y nix nix-daemon nix-legacy
 
 log "Writing default nix.conf"
 cat > /etc/nix/nix.conf <<'EOF'
