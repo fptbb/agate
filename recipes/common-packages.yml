@@ -62,6 +62,7 @@ modules:
 
         # Windows Compatibility & Gaming
         - gameconqueror # cheat engine for linux (debug and memory edit)
+        - input-remapper # remap input devices and create custom profiles for games
 
         # Storage & File Management
         - kde-partitionmanager # gui tool to manage disk partitions
