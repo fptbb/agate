@@ -86,6 +86,13 @@ modules:
   - type: script
     snippets:
       - "systemd-sysusers /usr/lib/sysusers.d/tor.conf"
+  # Install packages that may not be working and so do with skip-unavailable and skip-broken to avoid breaking the build
+  - type: dnf
+    install:
+      packages:
+        - https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm
+      skip-unavailable: true
+      skip-broken: true
   - type: systemd
     system:
       enabled:
