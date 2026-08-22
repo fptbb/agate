@@ -44,6 +44,8 @@ modules:
 
         # KDE Related
         - plasma-union
+        - qt6-qtwebsockets
+        - qt6-qtwebsockets-devel
 
         # Security & Authentication
         - pam-u2f # yubikey and fido u2f authentication for pam
