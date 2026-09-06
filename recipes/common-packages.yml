@@ -81,6 +81,7 @@ modules:
       - appimage-updater.sh
       - dnscrypt-proxy.sh
       - install-netbird.sh
+      - install-portmaster.sh
       # - whatpulse.sh
       # - opensnitch.sh
       # - install-millennium.sh
