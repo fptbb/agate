@@ -3,11 +3,9 @@ set -euo pipefail
 
 # ===================================
 # Install Portmaster on BlueBuild / Bazzite (Fedora Atomic)
-# Adapted from https://wiki.safing.io/en/Portmaster/Install/Linux
 # ===================================
 
 echo "[+] Installing Portmaster runtime dependencies..."
-# UI dependencies mentioned in the official notes
 dnf5 -y install \
     webkit2gtk4.1 \
     libayatana-appindicator-gtk3 \
@@ -24,23 +22,21 @@ mkdir -p /usr/lib/portmaster
 mkdir -p /var/lib/portmaster/intel
 mkdir -p /var/lib/portmaster/log
 
-cd /usr/lib/portmaster
-
-# Download Portmaster UpdateManager utility
+# Download UpdateManager to a temporary location (NOT inside /usr/lib/portmaster)
 echo "[+] Downloading Portmaster UpdateManager..."
-curl -fL --retry 5 -o updatemgr \
+curl -fL --retry 5 -o /tmp/updatemgr \
     https://updates.safing.io/latest/linux_amd64/updatemgr/updatemgr
-chmod a+x updatemgr
+chmod a+x /tmp/updatemgr
 
 # Download latest binaries
 echo "[+] Downloading Portmaster binaries..."
-./updatemgr download https://updates.safing.io/stable.v3.json "/usr/lib/portmaster"
+/tmp/updatemgr download https://updates.safing.io/stable.v3.json "/usr/lib/portmaster"
 chmod a+x /usr/lib/portmaster/portmaster
 chmod a+x /usr/lib/portmaster/portmaster-core
 
 # Download latest data files (intel)
 echo "[+] Downloading Portmaster data files..."
-./updatemgr download https://updates.safing.io/intel.v3.json "/var/lib/portmaster/intel"
+/tmp/updatemgr download https://updates.safing.io/intel.v3.json "/var/lib/portmaster/intel"
 
 # SELinux context (safe to run even if not needed)
 if command -v semanage >/dev/null 2>&1; then
@@ -50,7 +46,7 @@ if command -v semanage >/dev/null 2>&1; then
 fi
 
 # Clean up temporary tool
-rm -f /usr/lib/portmaster/updatemgr
+rm -f /tmp/updatemgr
 
 echo "[i] Portmaster binaries and data installed."
 
@@ -104,7 +100,6 @@ ExecStopPost=-/usr/lib/portmaster/portmaster-core -recover-iptables
 WantedBy=multi-user.target
 EOF
 
-# Enable the service so it starts on boot after the image is deployed
 systemctl enable portmaster.service
 
 # ===================================
@@ -150,12 +145,5 @@ mkdir -p /usr/share/pixmaps
 curl -fL --retry 5 -o /usr/share/pixmaps/portmaster.png \
     https://raw.githubusercontent.com/safing/portmaster-packaging/master/linux/portmaster_logo.png
 
-# ===================================
-# Done
-# ===================================
-
 echo
 echo "[✓] Portmaster installation complete."
-echo "    Service enabled: portmaster.service"
-echo "    UI launcher:     portmaster  (or from the application menu)"
-echo "    Autostart:       enabled via /etc/xdg/autostart"
