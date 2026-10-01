@@ -20,6 +20,7 @@ modules:
         - khal
 
         # system related just to make sure
+        - adw-gtk3-theme
         - qt6-qtmultimedia
         - cups-pk-helper
         - kf6-kwallet
