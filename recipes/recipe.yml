@@ -25,7 +25,6 @@ modules:
   # Branding Related Modules
   - type: os-release
     properties:
-      ID: agate
       VARIANT_ID: agate
       NAME: Agate
       PRETTY_NAME: Agate
