@@ -5,7 +5,7 @@ log() {
     echo "=== $* ==="
 }
 
-# Match the bazzite-dx /opt relocation for packages that still write into
+# Relocates /var/opt to /usr/lib/opt for packages that still write into
 # /var/opt during build, while staying harmless when there is nothing to move.
 mkdir -p /usr/lib/opt
 

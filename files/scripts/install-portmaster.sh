@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set ${SET_X:+-x} -eou pipefail
+trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
+log() {
+  echo "=== $* ==="
+}
 
 # ===================================
 # Install Portmaster on BlueBuild / Bazzite (Fedora Atomic)
 # ===================================
 
-echo "[+] Installing Portmaster runtime dependencies..."
+log "Installing Portmaster runtime dependencies"
 dnf5 -y install \
-    webkit2gtk4.1 \
-    libayatana-appindicator-gtk3 \
-    || dnf -y install \
     webkit2gtk4.1 \
     libayatana-appindicator-gtk3
 
@@ -17,30 +18,30 @@ dnf5 -y install \
 # STEP 1: Install Portmaster binaries & data
 # ===================================
 
-echo "[+] Creating directories..."
+log "Creating directories..."
 mkdir -p /usr/lib/portmaster
 mkdir -p /var/lib/portmaster/intel
 mkdir -p /var/lib/portmaster/log
 
 # Download UpdateManager to a temporary location (NOT inside /usr/lib/portmaster)
-echo "[+] Downloading Portmaster UpdateManager..."
+log "Downloading Portmaster UpdateManager..."
 curl -fL --retry 5 -o /tmp/updatemgr \
     https://updates.safing.io/latest/linux_amd64/updatemgr/updatemgr
 chmod a+x /tmp/updatemgr
 
 # Download latest binaries
-echo "[+] Downloading Portmaster binaries..."
+log "Downloading Portmaster binaries..."
 /tmp/updatemgr download https://updates.safing.io/stable.v3.json "/usr/lib/portmaster"
 chmod a+x /usr/lib/portmaster/portmaster
 chmod a+x /usr/lib/portmaster/portmaster-core
 
 # Download latest data files (intel)
-echo "[+] Downloading Portmaster data files..."
+log "Downloading Portmaster data files..."
 /tmp/updatemgr download https://updates.safing.io/intel.v3.json "/var/lib/portmaster/intel"
 
 # SELinux context (safe to run even if not needed)
 if command -v semanage >/dev/null 2>&1; then
-    echo "[+] Fixing SELinux permissions for portmaster-core..."
+    log "Fixing SELinux permissions for portmaster-core..."
     semanage fcontext -a -t bin_t -s system_u "$(realpath /usr/lib)/portmaster/portmaster-core" || true
     restorecon -R /usr/lib/portmaster/portmaster-core 2>/dev/null || true
 fi
@@ -48,13 +49,13 @@ fi
 # Clean up temporary tool
 rm -f /tmp/updatemgr
 
-echo "[i] Portmaster binaries and data installed."
+log "Portmaster binaries and data installed."
 
 # ===================================
 # STEP 2: Register Portmaster systemd service
 # ===================================
 
-echo "[+] Installing portmaster.service..."
+log "Installing portmaster.service..."
 cat > /usr/lib/systemd/system/portmaster.service << 'EOF'
 [Unit]
 Description=Portmaster by Safing
@@ -100,13 +101,17 @@ ExecStopPost=-/usr/lib/portmaster/portmaster-core -recover-iptables
 WantedBy=multi-user.target
 EOF
 
-systemctl enable portmaster.service
+# systemctl enable does not work inside a container build, so link the unit
+# into multi-user.target.wants directly, the same way install-netbird.sh does.
+log "Enabling portmaster.service"
+mkdir -p /usr/lib/systemd/system/multi-user.target.wants
+ln -sf ../portmaster.service /usr/lib/systemd/system/multi-user.target.wants/portmaster.service
 
 # ===================================
 # STEP 3: Register Portmaster UI
 # ===================================
 
-echo "[+] Installing Portmaster UI start script..."
+log "Installing Portmaster UI start script..."
 cat > /usr/lib/portmaster/portmaster-ui-start.sh << 'EOF'
 #!/bin/sh
 WEBKIT_DISABLE_COMPOSITING_MODE=1 /usr/lib/portmaster/portmaster "$@"
@@ -114,7 +119,7 @@ EOF
 chmod a+x /usr/lib/portmaster/portmaster-ui-start.sh
 ln -sf /usr/lib/portmaster/portmaster-ui-start.sh /usr/bin/portmaster
 
-echo "[+] Installing .desktop files..."
+log "Installing .desktop files..."
 cat > /usr/share/applications/portmaster.desktop << 'EOF'
 [Desktop Entry]
 Name=Portmaster
@@ -140,10 +145,10 @@ Categories=System;
 NoDisplay=true
 EOF
 
-echo "[+] Installing Portmaster icon..."
+log "Installing Portmaster icon..."
 mkdir -p /usr/share/pixmaps
 curl -fL --retry 5 -o /usr/share/pixmaps/portmaster.png \
     https://raw.githubusercontent.com/safing/portmaster-packaging/master/linux/portmaster_logo.png
 
 echo
-echo "[✓] Portmaster installation complete."
+log "Portmaster installation complete."

@@ -58,7 +58,7 @@ modules:
 
         # Development & Image Management
         - busybox # small and lightweight unix utilities for embedded systems
-        # - nix # package manager for reproducible builds and development environments
+        - code # Visual Studio Code, from the Microsoft repo added above
         - buildah # build oci/docker images without needing a daemon
         - upx # ultimate packer for executables (binary compressor)
 
@@ -82,10 +82,6 @@ modules:
       - dnscrypt-proxy.sh
       - install-netbird.sh
       - install-portmaster.sh
-      # - whatpulse.sh
-      # - opensnitch.sh
-      # - install-millennium.sh
-      # - install-protonvpn.sh
   - type: script
     snippets:
       - "systemd-sysusers /usr/lib/sysusers.d/tor.conf"
@@ -99,12 +95,10 @@ modules:
   - type: systemd
     system:
       enabled:
-        # - nix-daemon
+        # nix-daemon.service is enabled by files/scripts/nix.sh
         - nordvpnd
         - tailscaled
         - dnscrypt-proxy
         # - me.proton.vpn.split_tunneling.service
-        # - whatpulse-pcap-service
-        # - opensnitch
       disabled:
         - tor.service

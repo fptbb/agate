@@ -30,7 +30,6 @@ workflow:
                   - artifacthub-repo.yml
                   - artifacthub-repo-gh.yml
                   - cosign.pub
-                  - renovate.json
         - if: "$CI_COMMIT_BRANCH"
           changes:
               paths:
@@ -46,7 +45,6 @@ workflow:
                   - artifacthub-repo.yml
                   - artifacthub-repo-gh.yml
                   - cosign.pub
-                  - renovate.json
         # daily builds
         - if: "$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS"
           when: never
@@ -57,9 +55,12 @@ default:
 
 variables:
     IMAGE_NAME: "agate"
-    UPSTREAM_IMAGE: "ublue-os/bazzite-dx-nvidia"
+    UPSTREAM_IMAGE: "ublue-os/bazzite-nvidia-open"
     UPSTREAM_REGISTRY: "ghcr.io"
-    FORCE_BUILD: "$[[ inputs.force_build ]]"
+    # Manual override. Deliberately a different name from FORCE_BUILD so it does
+    # not shadow the value written to build.env by check-update; each gate ORs
+    # the two together.
+    FORCE_BUILD_INPUT: "$[[ inputs.force_build ]]"
     SIMULATE_SCHEDULE: "$[[ inputs.simulate_schedule ]]"
 
 
@@ -119,6 +120,7 @@ build-image:
     before_script:
         # skips build on scheduled or simulated pipelines if no update is found
         - |
+            if [ "${FORCE_BUILD_INPUT}" = "true" ]; then FORCE_BUILD=true; fi
             if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$SIMULATE_SCHEDULE" = "true" ]; then
               if [ "$FORCE_BUILD" != "true" ]; then
                 echo "No update found. Skipping build."
@@ -158,6 +160,7 @@ publish-metadata:
     before_script:
         # skips publish on scheduled or simulated pipelines if no update is found
         - |
+            if [ "${FORCE_BUILD_INPUT}" = "true" ]; then FORCE_BUILD=true; fi
             if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$SIMULATE_SCHEDULE" = "true" ]; then
               if [ "$FORCE_BUILD" != "true" ]; then
                 echo "No update found. Skipping publish."
@@ -213,6 +216,7 @@ cleanup-old-tags:
     script:
         # skips cleanup on scheduled or simulated pipelines if no update is found
         - |
+            if [ "${FORCE_BUILD_INPUT}" = "true" ]; then FORCE_BUILD=true; fi
             if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$SIMULATE_SCHEDULE" = "true" ]; then
               if [ "$FORCE_BUILD" != "true" ]; then
                 echo "No update found. Skipping cleanup."

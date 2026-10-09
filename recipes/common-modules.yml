@@ -1,0 +1,31 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+# Shared module list, pulled in by recipe.yml and recipe-testing.yml.
+# Anything added here lands in both channels; per-channel differences
+# (image-version, alt-tags, dotfiles, AGATE_CHANNEL) live in the recipes.
+#
+# Note: common.yml (kargs/initramfs/signing) is deliberately NOT in here -- it
+# must remain the final module of each recipe, so the recipes append it.
+
+modules:
+  - type: files
+    files:
+      - source: system
+        destination: / # copies files/system/* (* means everything inside it) into your image's root folder /
+
+  - from-file: common-packages.yml
+  - from-file: common-flatpaks.yml
+  - from-file: common-development.yml
+  - from-file: common-desktop-dev.yml
+  - from-file: common-windowmanager.yml
+  - from-file: common-theming.yml
+  - from-file: common-dotfiles.yml
+
+  # Branding Related Modules
+  - type: os-release
+    properties:
+      VARIANT_ID: agate
+      NAME: Agate
+      PRETTY_NAME: Agate
+      HOME_URL: https://os.fpt.icu
+      DEFAULT_HOSTNAME: fp-pc

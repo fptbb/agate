@@ -19,7 +19,8 @@ generate:
 
 validate:
     #!/usr/bin/bash
-    bluebuild validate
+    bluebuild validate ./recipes/recipe.yml
+    bluebuild validate ./recipes/recipe-testing.yml
 
 prune:
     #!/usr/bin/bash

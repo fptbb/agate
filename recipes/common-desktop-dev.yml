@@ -9,13 +9,12 @@ modules:
       skip-unavailable: true
       skip-broken: true
       packages:
-        # Useful desktop and development packages carried over from bazzite-dx.
+        # Desktop and development tooling kept in the image.
         - android-tools # adb and fastboot
         - bcc # BPF Compiler Collection, for bpftop and bpftrace
         - bpftop # BPF-based top-like process viewer
         - bpftrace # BPF tracing language and tool
         - ccache # Compiler cache to speed up rebuilds
-        - code # Visual Studio Code, for development
         - containerd.io # Container runtime, required by Docker
         - docker-buildx-plugin # Docker Buildx plugin for extended build capabilities
         - docker-ce # Docker Engine, for containerization
@@ -42,7 +41,7 @@ modules:
         - zsh # Z Shell, a powerful command-line interpreter
   - type: script
     scripts:
-      - agate-bazzite-port.sh
+      - agate-desktop-dev.sh
       - agate-opt-fix.sh
   - type: systemd
     system:

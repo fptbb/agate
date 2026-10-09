@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
 
+"""Removes expired package versions from GitHub Packages.
+
+Backend-specific concerns -- listing versions and deleting them -- stay here.
+The retention decision is delegated to scripts.common.retention.
+"""
+
 import logging
 import os
 import sys
-from datetime import datetime, timezone
 
-from scripts.ci.github_packages import GitHubPackagesClient
+from scripts.common.github_packages import GitHubPackagesClient
+from scripts.common.retention import (
+    ALL_PROTECTED,
+    ImageItem,
+    digest_from_signature_tag,
+    retention_from_env,
+    select_active_digests,
+    split_keep_delete,
+    summarize,
+)
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -24,81 +38,70 @@ class GitHubPackageCleaner:
 
         self.client = GitHubPackagesClient(self.image_name, self.username, self.token)
 
-    def run(self):
-        max_age_days = int(os.environ.get("MAX_AGE_DAYS", 7))
-        max_keep = int(os.environ.get("MAX_KEEP", 5))
-        protected_tags = ["latest", "latest-cache", "testing", "testing-cache"]
-
+    def collect_items(self) -> list:
+        """Normalise package versions into ImageItem records."""
         logger.info(f"Scanning package {self.image_name}...")
         versions = self.client.get_all_versions()
         logger.info(f"Found {len(versions)} versions.")
 
-        version_data = []
-        sig_data = []
-
-        for v in versions:
-            dt = self.client.parse_date(v["created_at"])
-            if not dt:
+        items = []
+        for version in versions:
+            created = self.client.parse_date(version.get("created_at"))
+            if not created:
                 continue
 
-            tags = v["metadata"]["container"]["tags"]
-            is_sig = any(t.endswith(".sig") for t in tags) if tags else False
-            if not tags:
-                is_sig = True
+            tags = tuple(version.get("metadata", {}).get("container", {}).get("tags", []) or [])
 
-            item = {
-                "id": v["id"],
-                "tags": tags,
-                "date": dt,
-                "digest": v["name"],
-            }
+            # A version with no tags is an orphaned signature: cosign detaches
+            # the .sig blob from its image once the image tag is gone.
+            if not tags or any(tag.endswith(".sig") for tag in tags):
+                signed = digest_from_signature_tag(tags[0]) if tags else ""
+                items.append(
+                    ImageItem(
+                        label=tags[0] if tags else version.get("name", "<untagged>"),
+                        digest=signed,
+                        date=created,
+                        tags=tags,
+                        is_signature=True,
+                        handle=str(version["id"]),
+                    )
+                )
+                continue
 
-            if is_sig:
-                sig_data.append(item)
-            else:
-                version_data.append(item)
+            items.append(
+                ImageItem(
+                    label=version.get("name", "<untagged>"),
+                    digest=version.get("name", ""),
+                    date=created,
+                    tags=tags,
+                    handle=str(version["id"]),
+                )
+            )
+        return items
 
-        version_data.sort(key=lambda x: x["date"], reverse=True)
+    def delete(self, item: ImageItem) -> None:
+        logger.info(f"Deleting {item.label} {item.tags}")
+        self.client.delete_version(int(item.handle))
 
-        active_digests = set()
-        image_count = 0
+    def run(self):
+        max_age_days, max_keep, protected = retention_from_env(ALL_PROTECTED)
 
-        for item in version_data:
-            tags = item["tags"]
-            digest = item["digest"]
-            age_days = (datetime.now(timezone.utc) - item["date"]).days
-            should_keep = False
+        items = self.collect_items()
+        active = select_active_digests(
+            items,
+            max_age_days=max_age_days,
+            max_keep=max_keep,
+            protected_tags=protected,
+        )
 
-            if any(t in protected_tags for t in tags):
-                should_keep = True
-            elif image_count < max_keep:
-                should_keep = True
-                image_count += 1
-            elif age_days <= max_age_days:
-                should_keep = True
+        keep, delete = split_keep_delete(items, active)
+        summarize(keep, delete, f"ghcr.io/{self.username}/{self.image_name}")
 
-            if should_keep:
-                active_digests.add(digest)
-
-        logger.info(f"Analysis Complete. Keeping {len(active_digests)} images. Proceeding to cleanup.")
-
-        for item in version_data:
-            if item["digest"] not in active_digests:
-                logger.info(f"Deleting expired image {item['digest']} {item['tags']}")
-                self.client.delete_version(item["id"])
-
-        for item in sig_data:
-            if item["tags"]:
-                sig_tag = item["tags"][0]
-                clean_digest = sig_tag.replace(".sig", "").replace("-", ":")
-                if clean_digest not in active_digests:
-                    logger.info(f"Deleting orphaned signature {item['digest']} {item['tags']}")
-                    self.client.delete_version(item["id"])
-            else:
-                logger.info(f"Deleting untagged signature {item['digest']}")
-                self.client.delete_version(item["id"])
+        for item in keep:
+            logger.info(f"Keeping {item.label} {item.tags}")
+        for item in delete:
+            self.delete(item)
 
 
 if __name__ == "__main__":
-    cleaner = GitHubPackageCleaner()
-    cleaner.run()
+    GitHubPackageCleaner().run()

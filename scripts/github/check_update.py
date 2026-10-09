@@ -1,17 +1,44 @@
 #!/usr/bin/env python3
 
+"""GitHub Actions update check.
+
+Fetches upstream/local tag dates via the shared helpers, then delegates the
+comparison to scripts.common.update_check. On a detected update it also nudges
+the GitLab mirror by triggering a pipeline there.
+"""
+
 import json
 import logging
 import os
 import sys
+
 import requests
 
-from scripts.ci.common import write_key_value_file
-from scripts.ci.registry import DockerRegistryClient
+from scripts.common.github_packages import GitHubPackagesClient
+from scripts.common.registry import DockerRegistryClient
+from scripts.common.update_check import CHANNELS, compare, recipes_to_build
+from scripts.common.utils import write_key_value_file
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+GITLAB_PROJECT_ID = os.environ.get("GITLAB_PROJECT_ID", "76001048")
+
+
+def trigger_gitlab_mirror():
+    """Ask the GitLab mirror to rebuild. Its own update check is the final gate."""
+    token = os.environ.get("GITLAB_TOKEN")
+    if not token:
+        logger.warning("GITLAB_TOKEN not set; skipping GitLab mirror trigger.")
+        return
+
+    url = f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/trigger/pipeline"
+    try:
+        resp = requests.post(url, data={"token": token, "ref": "main"}, timeout=30)
+        logger.info(f"GitLab mirror trigger returned {resp.status_code}")
+    except Exception as exc:
+        logger.error(f"Failed to trigger the GitLab mirror: {exc}")
 
 
 def main():
@@ -28,70 +55,29 @@ def main():
         is_ghcr=("ghcr.io" in upstream_registry.lower()),
     )
 
-    logger.info(f"Checking Local (GitHub API): {user}/{image_name}")
-    local_tags_dates = {}
+    logger.info(f"Checking Local (GitHub Packages): {user}/{image_name}")
     try:
-        api_url = f"https://api.github.com/users/{user}/packages/container/{image_name}/versions"
-        headers = {"Accept": "application/vnd.github.v3+json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
+        local_client = GitHubPackagesClient(image_name, user, token)
+        local_dates = local_client.get_tag_dates()
+    except Exception as exc:
+        logger.error(f"Error fetching local dates from GitHub Packages: {exc}")
+        local_dates = {}
 
-        resp = requests.get(api_url, headers=headers)
-        if resp.status_code == 200:
-            for v in resp.json():
-                tags = v.get("metadata", {}).get("container", {}).get("tags", [])
-                for tag in tags:
-                    if tag not in local_tags_dates:
-                        date_str = v.get("created_at")
-                        if date_str:
-                            local_tags_dates[tag] = upstream_client.parse_date(date_str)
-        else:
-            logger.error(f"GitHub API fetch failed: {resp.status_code} - {resp.text}")
-    except Exception as e:
-        logger.error(f"Error fetching local date via GitHub API: {e}")
+    upstream_dates = {tag: upstream_client.get_created_date(tag) for tag, _ in CHANNELS}
 
-    tags_to_check = {
-        "latest": "recipe.yml",
-        "testing": "recipe-testing.yml",
-    }
+    channels = compare(upstream_dates, local_dates, CHANNELS)
+    recipes = recipes_to_build(channels)
 
-    recipes_to_build = []
-    any_update = False
+    github_output = os.environ["GITHUB_OUTPUT"]
+    write_key_value_file(github_output, "needs_update", "true" if recipes else "false")
+    write_key_value_file(github_output, "recipes", json.dumps(recipes))
 
-    for tag, recipe in tags_to_check.items():
-        logger.info(f"Analyzing tag: {tag}")
-        ud = upstream_client.get_created_date(tag)
-        ld = local_tags_dates.get(tag)
-
-        build_this = False
-        if not ud:
-            logger.error(f"Could not fetch upstream date for {tag}. Building anyway.")
-            build_this = True
-        elif not ld:
-            logger.warning(f"Could not fetch local date for {tag}. Assuming first build. Building anyway.")
-            build_this = True
-        elif ud > ld:
-            logger.info(f"Update Available for {tag}. Upstream: {ud}, Local: {ld}")
-            build_this = True
-        else:
-            logger.info(f"Tag {tag} is up to date. Upstream: {ud}, Local: {ld}")
-
-        if build_this:
-            recipes_to_build.append(recipe)
-            any_update = True
-
-    write_key_value_file(os.environ["GITHUB_OUTPUT"], "needs_update", "true" if any_update else "false")
-    write_key_value_file(os.environ["GITHUB_OUTPUT"], "recipes", json.dumps(recipes_to_build))
-
-    if any_update:
-        logger.info(f"Updates found for: {recipes_to_build}. Proceeding to build.")
-        requests.post(
-            "https://gitlab.com/api/v4/projects/76001048/trigger/pipeline",
-            data={"token": os.environ.get("GITLAB_TOKEN"), "ref": "main"},
-        )
+    if recipes:
+        logger.info(f"Updates found for: {recipes}. Proceeding to build.")
+        trigger_gitlab_mirror()
     else:
         logger.info("Everything is up to date.")
-    
+
     sys.exit(0)
 
 

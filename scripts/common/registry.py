@@ -6,7 +6,7 @@ import logging
 import requests
 from requests.auth import HTTPBasicAuth
 
-from scripts.ci.common import parse_iso_datetime
+from scripts.common.utils import parse_iso_datetime
 
 
 logger = logging.getLogger(__name__)

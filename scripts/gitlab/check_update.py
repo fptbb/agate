@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 
+"""GitLab update check.
+
+This pipeline only publishes the latest channel -- recipe-testing.yml is built
+by GitHub Actions alone -- so only that channel is compared. The decision logic
+lives in scripts.common.update_check.
+"""
+
 import logging
 import os
 import smtplib
@@ -7,8 +14,9 @@ import ssl
 import sys
 from email.message import EmailMessage
 
-from scripts.ci.common import write_key_value_file
-from scripts.ci.registry import DockerRegistryClient
+from scripts.common.registry import DockerRegistryClient
+from scripts.common.update_check import LATEST_ONLY, compare, recipes_to_build
+from scripts.common.utils import write_key_value_file
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -46,7 +54,7 @@ def send_notification(upstream_date, local_date):
 
 
 def main():
-    upstream_image = os.environ.get("UPSTREAM_IMAGE", "ublue-os/bazzite-dx-nvidia")
+    upstream_image = os.environ.get("UPSTREAM_IMAGE", "ublue-os/bazzite-nvidia-open")
     upstream_registry = os.environ.get("UPSTREAM_REGISTRY", "ghcr.io")
     namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
     image_name = os.environ.get("IMAGE_NAME", "agate")
@@ -61,33 +69,22 @@ def main():
         upstream_image,
         is_ghcr=("ghcr.io" in upstream_registry.lower()),
     )
-    ud = upstream_client.get_created_date("latest")
 
     logger.info(f"Checking Local: {registry}/{local_image}")
     local_client = DockerRegistryClient(registry, local_image, username=user, password=pwd)
-    ld = local_client.get_created_date("latest")
 
-    if not ud:
-        logger.error("Could not fetch upstream date.")
+    upstream_dates = {tag: upstream_client.get_created_date(tag) for tag, _ in LATEST_ONLY}
+    local_dates = {tag: local_client.get_created_date(tag) for tag, _ in LATEST_ONLY}
+
+    channels = compare(upstream_dates, local_dates, LATEST_ONLY)
+
+    if recipes_to_build(channels):
+        send_notification(channels[0].upstream, channels[0].local)
         write_key_value_file("build.env", "FORCE_BUILD", "true")
-        sys.exit(0)
+    else:
+        logger.info("System is up to date. Stopping pipeline.")
+        write_key_value_file("build.env", "FORCE_BUILD", "false")
 
-    if not ld:
-        logger.warning("Could not fetch local date. Assuming first build.")
-        write_key_value_file("build.env", "FORCE_BUILD", "true")
-        sys.exit(0)
-
-    logger.info(f"Upstream Date: {ud}")
-    logger.info(f"Local Date:    {ld}")
-
-    if ud > ld:
-        logger.info("Update Available. Proceeding to build.")
-        send_notification(ud, ld)
-        write_key_value_file("build.env", "FORCE_BUILD", "true")
-        sys.exit(0)
-
-    logger.info("System is up to date. Stopping pipeline.")
-    write_key_value_file("build.env", "FORCE_BUILD", "false")
     sys.exit(0)
 
 

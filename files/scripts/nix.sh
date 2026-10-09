@@ -71,8 +71,3 @@ systemctl enable nix-store-init.service
 
 log "Enabling nix-daemon.service"
 systemctl enable nix-daemon.service
-
-## Old installation method (commented out) for reference
-# mkdir -p /nix && \
-# 	curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix -o /nix/determinate-nix-installer.sh && \
-# 	chmod a+rx /nix/determinate-nix-installer.sh

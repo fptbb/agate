@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import requests
 
-from scripts.ci.common import parse_iso_datetime
+from scripts.common.utils import parse_iso_datetime
 
 
 logger = logging.getLogger(__name__)
@@ -149,3 +149,19 @@ class GitHubPackagesClient:
                     return self.parse_date(date_str)
                 break
         return None
+
+    def get_tag_dates(self) -> dict:
+        """Map every tag to the creation date of the version carrying it.
+
+        Walks every page, so tags beyond the first page are found too.
+        """
+        tag_dates = {}
+        for version in self.get_all_versions():
+            created = self.parse_date(version.get("created_at"))
+            if not created:
+                continue
+
+            container = version.get("metadata", {}).get("container", {})
+            for tag in container.get("tags", []) or []:
+                tag_dates.setdefault(tag, created)
+        return tag_dates

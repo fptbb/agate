@@ -5,13 +5,11 @@ log() {
     echo "=== $* ==="
 }
 
-# Keep the x86_64 virtualization stack without dragging the full multi-arch
-# emulation set back in. common-debloat.yml removes the extra qemu targets.
+# OVMF firmware for the qemu/libvirt stack installed by this recipe.
 dnf5 --setopt=install_weak_deps=False install -y \
     edk2-ovmf
 
-# Keep the DX carry-over focused on dev and desktop tooling that still applies
-# now that the image no longer inherits from the deck/gamemode branch.
+# input-remapper ships hidden; unhide it so it is usable from the launcher.
 if [[ -f /usr/share/applications/input-remapper-gtk.desktop ]]; then
     sed -i 's@^NoDisplay=true@NoDisplay=false@' /usr/share/applications/input-remapper-gtk.desktop
 fi

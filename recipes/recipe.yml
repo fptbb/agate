@@ -7,34 +7,17 @@ base-image: ghcr.io/ublue-os/bazzite-nvidia-open
 image-version: latest
 
 modules:
-  - type: files
-    files:
-      - source: system
-        destination: / # copies files/system/* (* means everything inside it) into your image's root folder /
+  # Shared modules; see recipes/common-modules.yml
+  - from-file: common-modules.yml
 
-  # Common Modules
-  - from-file: common-packages.yml
-  - from-file: common-flatpaks.yml
-  - from-file: common-development.yml
-  - from-file: common-bazzite-port.yml
-  - from-file: common-windowmanager.yml
-  # - from-file: common-dotfiles.yml
-  - from-file: common-debloat.yml
-  - from-file: common-theming.yml
-
-  # Branding Related Modules
-  - type: os-release
-    properties:
-      VARIANT_ID: agate
-      NAME: Agate
-      PRETTY_NAME: Agate
-      HOME_URL: https://os.fpt.icu
-      DEFAULT_HOSTNAME: fp-pc
+  # Branding channel
   - type: script
+    env:
+      AGATE_CHANNEL: latest
     scripts:
       - branding.sh
 
-  # Obligatory Common Modules, do not remove.
+  # Obligatory Common Modules, do not remove. Must stay last.
   - from-file: common.yml
 
 labels:
