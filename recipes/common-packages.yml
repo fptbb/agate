@@ -6,7 +6,6 @@ modules:
       cleanup: true
       copr:
         - fptbb/packages
-        - fptbb/fp-appimage-updater
         - bigjapka/VeraCrypt
         - komapro/rbw
       files:
