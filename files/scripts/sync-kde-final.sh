@@ -3,32 +3,41 @@ set ${SET_X:+-x} -eou pipefail
 trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
 log() { echo "=== $* ==="; }
 
-# Find the enabled COPR repository ID.
-repo_id="$(
-    dnf5 repolist --enabled |
-        awk '$1 ~ /kde-final/ { print $1; exit }'
-)"
+repo_id="copr:copr.fedorainfracloud.org:group_kdesig:kde-final"
 
-if [[ -z "$repo_id" ]]; then
-    log "ERROR: KDE Final COPR repository not found."
+# Ensure the COPR is enabled.
+if ! dnf5 repolist --enabled | grep -Fq "$repo_id"; then
+    log "ERROR: KDE Final COPR is not enabled: $repo_id" >&2
     exit 1
 fi
 
-# Get installed package names that are also available in this COPR.
+# Query package names, explicitly separating each result with a newline.
+if ! available_names="$(
+    dnf5 repoquery --available \
+        --repo="$repo_id" \
+        --queryformat='%{name}\n'
+)"; then
+    log "ERROR: Failed to query KDE Final COPR." >&2
+    exit 1
+fi
+
+# Match COPR package names against currently installed packages.
 mapfile -t packages < <(
     comm -12 \
-        <(rpm -qa --qf '%{NAME}\n' | sort -u) \
-        <(dnf5 repoquery --available --repoid="$repo_id" --qf '%{name}' | sort -u)
+        <(rpm -qa --qf '%{NAME}\n' | LC_ALL=C sort -u) \
+        <(printf '%s\n' "$available_names" | LC_ALL=C sort -u)
 )
 
 if ((${#packages[@]} == 0)); then
-    log "No installed packages found in $repo_id; nothing to synchronize."
-    exit 0
+    log "ERROR: No installed packages matched the COPR. Aborting." >&2
+    exit 1
 fi
 
-printf 'Synchronizing %d installed packages from %s\n' \
-    "${#packages[@]}" "$repo_id"
+printf 'Synchronizing %d installed packages:\n' "${#packages[@]}"
+printf '  %s\n' "${packages[@]}"
 
-# Allow dependency resolution to remove incompatible packages if necessary.
+# Synchronize matching packages and resolve dependencies.
 dnf5 distro-sync --refresh --allowerasing --assumeyes \
     "${packages[@]}"
+
+log "KDE Final package synchronization completed."
