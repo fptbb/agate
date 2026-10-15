@@ -19,23 +19,6 @@ modules:
     scripts:
       - branding.sh
 
-  ### [TEST MODULES START] ###
-    # Enable the KDE SIG testing repository.
-  - type: dnf
-    no-cache: true
-    repos:
-      copr:
-        enable:
-          - "@kdesig/kde-final"
-
-  # Synchronize installed packages provided by this COPR.
-  - type: script
-    no-cache: true
-    scripts:
-      - sync-kde-final.sh
-
-  ### [TEST MODULES END] ###
-
   # Obligatory Common Modules, do not remove. Must stay last.
   - from-file: common.yml
 

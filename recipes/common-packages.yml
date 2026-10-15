@@ -7,18 +7,13 @@ modules:
       copr:
         - fptbb/packages
         - bigjapka/VeraCrypt
-        - komapro/rbw
       files:
         - nordvpn.repo
         - tailscale.repo
-        - cloudflare-warp.repo
         - vscode.repo
-        - ferron.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
-        - https://pkg.cloudflareclient.com/pubkey.gpg
         - https://packages.microsoft.com/keys/microsoft.asc
-        - http://rpm.ferron.sh/signing.pgp
     install:
       skip-unavailable: true
       skip-broken: true
@@ -35,7 +30,6 @@ modules:
         - dnscrypt-proxy # dnscrypt proxy for encrypted dns queries
         - tor # anonymity network for secure and private browsing
         - torsocks # wrapper to force applications to use tor for network connections
-        - ferron # Web Server in Rust
 
         # System Utilities & CLI Enhancement
         - powerline-fonts # patched fonts with powerline symbols
@@ -73,7 +67,6 @@ modules:
         - chezmoi # manage your dotfiles across multiple machines
         - age # simple, modern and secure file encryption tool
         - expect # automate interactive applications with scripts
-        - rbw # bitwarden cli client for managing secrets in the terminal
   - type: script
     scripts:
       - fido2.sh
