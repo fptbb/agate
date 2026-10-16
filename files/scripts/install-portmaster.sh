@@ -112,10 +112,12 @@ ln -sf ../portmaster.service /usr/lib/systemd/system/multi-user.target.wants/por
 # ===================================
 
 log "Installing Portmaster UI start script..."
-cat > /usr/lib/portmaster/portmaster-ui-start.sh << 'EOF'
+cat > /usr/lib/portmaster/portmaster-ui-start.sh <<'EOF'
 #!/bin/sh
-WEBKIT_DISABLE_COMPOSITING_MODE=1 /usr/lib/portmaster/portmaster "$@"
+export __NV_DISABLE_EXPLICIT_SYNC=1
+exec /usr/lib/portmaster/portmaster "$@"
 EOF
+
 chmod a+x /usr/lib/portmaster/portmaster-ui-start.sh
 ln -sf /usr/lib/portmaster/portmaster-ui-start.sh /usr/bin/portmaster
 
