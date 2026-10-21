@@ -1,0 +1,17 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: fonts
+    fonts:
+      nerd-fonts:
+        - FiraCode
+        - FiraMono
+        - NerdFontsSymbolsOnly
+  - type: justfiles
+    validate: true
+    include:
+      - themes.just
+  - type: script@v2
+    scripts:
+      - theming.sh

@@ -1,0 +1,100 @@
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: dnf
+    repos:
+      cleanup: true
+      copr:
+        - fptbb/packages
+        - bigjapka/VeraCrypt
+      files:
+        - nordvpn.repo
+        - tailscale.repo
+        - vscode.repo
+      keys:
+        - https://repo.nordvpn.com/gpg/nordvpn_public.asc
+        - https://packages.microsoft.com/keys/microsoft.asc
+    install:
+      skip-unavailable: true
+      skip-broken: true
+      packages:
+        # Own Packages
+        - fp-appimage-updater # declarative appimage updater
+        - fp-dotfiles-manager # manage dotfiles with style
+        - fp-no-dash # personal web dashboard and launcher
+
+        # Networking & VPNs
+        - nordvpn # nordvpn's cli client for linux
+        - tailscale # a zero-config vpn and private network tool
+        - libpcap # packet capture library for network sniffing tools
+        - dnscrypt-proxy # dnscrypt proxy for encrypted dns queries
+        - tor # anonymity network for secure and private browsing
+        - torsocks # wrapper to force applications to use tor for network connections
+
+        # System Utilities & CLI Enhancement
+        - powerline-fonts # patched fonts with powerline symbols
+        - plasma-drkonqi # plasma crash handler for debugging applications
+
+        # KDE Related
+        - plasma-union
+        - qt6-qtwebsockets
+        - qt6-qtwebsockets-devel
+
+        # Security & Authentication
+        - pam-u2f # yubikey and fido u2f authentication for pam
+        - libfido2 # fido2 library for u2f support in browsers and other applications
+        - fido2-tools # command line tools for fido2 devices
+        - gnupg2 # openpgp encryption and signing tools
+        - veracrypt # disk encryption software based on truecrypt
+        - fuse-encfs # encrypted filesystem support via fuse
+        - kleopatra # gpg key manager and certificate manager
+
+        # Development & Image Management
+        - busybox # small and lightweight unix utilities for embedded systems
+        - code # Visual Studio Code, from the Microsoft repo added above
+        - buildah # build oci/docker images without needing a daemon
+        - upx # ultimate packer for executables (binary compressor)
+
+        # Windows Compatibility & Gaming
+        - gameconqueror # cheat engine for linux (debug and memory edit)
+        - input-remapper # remap input devices and create custom profiles for games
+
+        # Storage & File Management
+        - kde-partitionmanager # gui tool to manage disk partitions
+        - dolphin-plugins # dolphin integration for revision control systems, dropbox, and disk images
+
+        # Dotfiles, Automation & Secrets
+        - chezmoi # manage your dotfiles across multiple machines
+        - age # simple, modern and secure file encryption tool
+        - expect # automate interactive applications with scripts
+
+        # Miscellaneous / Other
+        - cairo-devel # 2D graphics library for vector graphics and image rendering
+        - dejavu-sans-fonts # open source font family based on the Vera Sans typeface
+  - type: script
+    scripts:
+      - fido2.sh
+      - appimage-updater.sh
+      - dnscrypt-proxy.sh
+      - install-netbird.sh
+      - install-portmaster.sh
+  - type: script
+    snippets:
+      - "systemd-sysusers /usr/lib/sysusers.d/tor.conf"
+  # Install packages that may not be working and so do with skip-unavailable and skip-broken to avoid breaking the build
+  - type: dnf
+    install:
+      packages:
+        - https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm
+      skip-unavailable: true
+      skip-broken: true
+  - type: systemd
+    system:
+      enabled:
+        # nix-daemon.service is enabled by files/scripts/nix.sh
+        - nordvpnd
+        - tailscaled
+        - dnscrypt-proxy
+        # - me.proton.vpn.split_tunneling.service
+      disabled:
+        - tor.service

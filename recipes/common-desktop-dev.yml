@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: dnf
+    repos:
+      files:
+        - docker-ce.repo
+    install:
+      skip-unavailable: true
+      skip-broken: true
+      packages:
+        # Desktop and development tooling kept in the image.
+        - android-tools # adb and fastboot
+        - bcc # BPF Compiler Collection, for bpftop and bpftrace
+        - bpftop # BPF-based top-like process viewer
+        - bpftrace # BPF tracing language and tool
+        - ccache # Compiler cache to speed up rebuilds
+        - containerd.io # Container runtime, required by Docker
+        - docker-buildx-plugin # Docker Buildx plugin for extended build capabilities
+        - docker-ce # Docker Engine, for containerization
+        - docker-ce-cli # Docker Command Line Interface
+        - docker-compose-plugin # Docker Compose plugin for container orchestration
+        - flatpak-builder # Flatpak application builder
+        - git-subtree # Git subtree merge tool
+        - guestfs-tools # Tools for working with virtual machine disk images
+        - libvirt # Virtualization API and tools
+        - nicstat # Network interface statistics tool
+        - numactl # NUMA control tool
+        - podman-machine # Podman machine management tool
+        - podman-tui # Podman terminal user interface
+        - python3-ramalama # Python 3 bindings for Ramalama
+        - qemu # QEMU emulator, for running virtual machines
+        - qemu-kvm # QEMU KVM accelerator
+        - restic # Backup tool
+        - rclone # Remote file storage synchronization tool
+        - sysprof # System performance profiler
+        - tiptop # Top-like process viewer for BPF
+        - usbmuxd # USB multiplexing daemon, for iOS device management
+        - virt-manager # Virtual machine management tool
+        - waypipe # Wayland proxy for X11 applications
+        - zsh # Z Shell, a powerful command-line interpreter
+  - type: script
+    scripts:
+      - agate-desktop-dev.sh
+      - agate-opt-fix.sh
+  - type: systemd
+    system:
+      enabled:
+        - agate-dev-groups.service # Add user to necessary groups for development and containerization.
+        - docker.socket # Enable Docker socket for communication with the Docker daemon.
+        - podman.socket # Enable Podman socket for communication with the Podman daemon.
+        - input-remapper.service # Service for remapping input devices, useful for gaming and custom input configurations.
+        - uupd.timer # Timer for updating the system and installed packages regularly.

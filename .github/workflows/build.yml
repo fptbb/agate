@@ -1,0 +1,115 @@
+name: bluebuild
+on:
+    schedule:
+        - cron: "*/30 * * * *" # build every 30 minutes
+    push:
+    pull_request:
+    workflow_dispatch: # allow manually triggering builds
+concurrency:
+    # only run one build at a time
+    group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+    cancel-in-progress: true
+
+env:
+    IMAGE_NAME: "agate"
+    REGISTRY: "ghcr.io"
+
+jobs:
+    check-update:
+        name: Check for updates
+        if: github.event_name == 'schedule'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: read
+        outputs:
+            needs-update: ${{ steps.check.outputs.needs_update }}
+            recipes: ${{ steps.check.outputs.recipes }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v7
+
+            - name: Check if update is needed
+              id: check
+              shell: bash
+              env:
+                  UPSTREAM_IMAGE: "ublue-os/bazzite-nvidia-open"
+                  UPSTREAM_REGISTRY: "ghcr.io"
+                  IMAGE_NAME: ${{ env.IMAGE_NAME }}
+                  REGISTRY: ${{ env.REGISTRY }}
+                  USERNAME: ${{ github.repository_owner }}
+                  TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+              run: |
+                  pip install requests
+                  python3 -m scripts.github.check_update
+
+    bluebuild:
+        name: Build Custom Image
+        needs: check-update
+        # Only build on push/manual (which skips check-update), OR if check-update explicitly outputs true.
+        # use always() to ensure it runs even if check-update is skipped.
+        if: |
+            always() && 
+            (needs.check-update.result == 'skipped' || (needs.check-update.outputs.needs-update == 'true' && needs.check-update.outputs.recipes != '[]'))
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+            id-token: write
+        strategy:
+            fail-fast: false
+            matrix:
+                recipe: ${{ fromJson(needs.check-update.outputs.recipes || '["recipe.yml", "recipe-testing.yml"]') }}
+        steps:
+            - name: Maximize build space
+              uses: ublue-os/container-storage-action@main
+            - name: Build Custom Image
+              uses: blue-build/github-action@v1.13
+              with:
+                  recipe: ${{ matrix.recipe }}
+                  cosign_private_key: ${{ secrets.SIGNING_SECRET }}
+                  registry_token: ${{ github.token }}
+                  pr_event_number: ${{ github.event.number }}
+                  build_opts: --build-driver=podman --run-driver=podman
+                  use_cache: true
+
+                  maximize_build_space: false
+
+            - name: Install ORAS
+              uses: oras-project/setup-oras@v2
+
+            - name: Login to Container Registry
+              run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            - name: Publish Artifact Hub Manifest
+              if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+              run: |
+                  REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+                  oras push \
+                    ${{ env.REGISTRY }}/$REPO_OWNER/${{ env.IMAGE_NAME }}:artifacthub.io \
+                    --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+                    artifacthub-repo-gh.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
+
+#    cleanup-old-tags:
+#        name: Cleanup old tags
+#        runs-on: ubuntu-latest
+#        needs: bluebuild
+#        if: always() # Run even if bluebuild fails or is skipped
+#        permissions:
+#            packages: write
+#        steps:
+#            - name: Checkout repository
+#              uses: actions/checkout@v7
+#
+#            - name: Cleanup old tags
+#              shell: bash
+#              env:
+#                  IMAGE_NAME: ${{ env.IMAGE_NAME }}
+#                  USERNAME: ${{ github.repository_owner }}
+#                  TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#                  MAX_AGE_DAYS: "7"
+#                  MAX_KEEP: "5"
+#              run: |
+#                  pip install requests
+#                  python3 -m scripts.github.cleanup_old_tags

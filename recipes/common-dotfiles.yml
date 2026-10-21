@@ -1,0 +1,17 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: chezmoi
+    repository: "git@gitlab.com:fptbb/dotfiles.git"
+    file-conflict-policy: skip
+    disable-init: true
+    run-every: '4h'
+  - type: files
+    files:
+      - source: dotfiles-manager
+        destination: /
+  - type: justfiles
+    validate: true
+    include:
+      - dotfiles.just
