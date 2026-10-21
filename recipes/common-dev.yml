@@ -41,10 +41,10 @@ modules:
         - zsh # Z Shell, a powerful command-line interpreter
   - type: script
     scripts:
-      - agate-desktop-dev.sh
-      - agate-opt-fix.sh
+      - dev.sh
+      - opt-fix.sh
       - nix.sh
-      - malachite-setup.sh
+      - malachite.sh
   - type: justfiles
     validate: true
     include: # use just --fmt --check --unstable --justfile to validate justfiles

@@ -102,7 +102,7 @@ WantedBy=multi-user.target
 EOF
 
 # systemctl enable does not work inside a container build, so link the unit
-# into multi-user.target.wants directly, the same way install-netbird.sh does.
+# into multi-user.target.wants directly, the same way netbird.sh does.
 log "Enabling portmaster.service"
 mkdir -p /usr/lib/systemd/system/multi-user.target.wants
 ln -sf ../portmaster.service /usr/lib/systemd/system/multi-user.target.wants/portmaster.service

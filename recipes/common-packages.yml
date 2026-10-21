@@ -74,10 +74,9 @@ modules:
   - type: script
     scripts:
       - fido2.sh
-      - appimage-updater.sh
-      - dnscrypt-proxy.sh
-      - install-netbird.sh
-      - install-portmaster.sh
+      - dnscrypt.sh
+      - netbird.sh
+      - portmaster.sh
   - type: script
     snippets:
       - "systemd-sysusers /usr/lib/sysusers.d/tor.conf"
