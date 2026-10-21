@@ -4,7 +4,7 @@
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate)](https://artifacthub.io/packages/search?repo=agate)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate-alt)](https://artifacthub.io/packages/search?repo=agate-alt)
 
-**Website: [os.fpt.icu](https://os.fpt.icu)**
+**Website:** [**os.fpt.icu**](https://os.fpt.icu)
 
 ## Overview
 
@@ -16,12 +16,13 @@ Base image: `ghcr.io/ublue-os/bazzite-nvidia-open:latest` (KDE Plasma, NVIDIA).
 
 ## What It Does
 
-*   Stays atomic and rollback-friendly.
-*   Adds personal branding, wallpapers, icons, and KDE tweaks.
-*   Enables `nordvpnd`, `tailscaled`, `dnscrypt-proxy`, `podman.socket`, `docker.socket`, `input-remapper`, and `uupd.timer`.
-*   Ships curated RPMs and Flatpaks for development, gaming, media, and daily work.
-*   Adds a Niri Wayland session alongside Plasma, with DankMaterialShell, cava, khal, and matugen.
-*   Includes `ujust` tasks for dotfiles, theming, Nix/Devbox, Spicetify, GPG, and YubiKey/LUKS setup.
+* Stays atomic and rollback-friendly.
+* Adds personal branding, wallpapers, icons, and KDE tweaks.
+* Enables `nordvpnd`, `tailscaled`, `dnscrypt-proxy`, `podman.socket`, `docker.socket`, `input-remapper`, and `uupd.timer`.
+* Ships curated RPMs and Flatpaks for development, gaming, media, and daily work.
+* Adds a Niri Wayland session alongside KDE Plasma, with Dux Shell (formerly DankMaterialShell), Dux Files, cava, khal, and matugen. Plasma keeps its native KDE experience, while Niri uses its own shell and session configuration.
+* Seeds default Niri/Dux Shell configuration for new users, so a personal dotfiles checkout is not required to get started.
+* Includes `ujust` tasks for dotfiles, theming, Nix/Devbox, Spicetify, GPG, and YubiKey/LUKS setup.
 
 ## Recipes
 
@@ -32,10 +33,8 @@ Base image: `ghcr.io/ublue-os/bazzite-nvidia-open:latest` (KDE Plasma, NVIDIA).
 | `common-modules.yml` | The shared module list; both channels include it. |
 | `common.yml` | Kargs, initramfs, and cosign signing. Required, and must stay last. |
 | `common-packages.yml` | Extra COPRs, repo files, RPMs, and services. |
-| `common-flatpaks.yml` | System-wide Flatpaks. |
-| `common-desktop-dev.yml` | Desktop and development tooling, Docker, virtualization. |
-| `common-development.yml` | Nix setup and dev `ujust` tasks. |
-| `common-windowmanager.yml` | Niri, DankMaterialShell, and theming packages. |
+| `common-dev.yml` | Desktop and development tooling, Docker, virtualization. Nix setup and dev `ujust` tasks |
+| `common-dux.yml` | Niri, Dux Shell, Dux Files, theming packages, and session integration. |
 | `common-theming.yml` | Nerd fonts and theme tasks. |
 | `common-dotfiles.yml` | chezmoi integration and dotfile tasks. |
 
@@ -87,17 +86,17 @@ Reboot afterwards. Check status any time with `sudo bootc status`.
 
 After rebasing, `ujust --list` shows every available task. The main groups:
 
-*   `dotfiles-*` — bootstrap, sync, apply, diff, and push your dotfiles.
-*   `agate-devbox` — install Devbox. Nix ships in the image already.
-*   `agate-manage-themes` — install Catppuccin, Kora, and PlasMusic.
-*   `agate-spicetify` — patch Spotify and install Spicetify Marketplace.
-*   `agate-luks-setup`, `agate-luks-remove`, `agate-kde-setup` — manage YubiKey-backed LUKS and authentication.
-*   `agate-gpg-*`, `agate-sign`, `agate-encrypt`, `agate-decrypt` — GPG and YubiKey signing helpers.
-*   `malachite`, `container`, `toggle-services`, `toggle-tor` — distrobox, container, and service management.
+* `dotfiles-*` — bootstrap, sync, apply, diff, and push your dotfiles.
+* `agate-devbox` — install Devbox. Nix ships in the image already.
+* `agate-manage-themes` — install Catppuccin, Kora, and PlasMusic.
+* `agate-spicetify` — patch Spotify and install Spicetify Marketplace.
+* `agate-luks-setup`, `agate-luks-remove`, `agate-kde-setup` — manage YubiKey-backed LUKS and authentication.
+* `agate-gpg-*`, `agate-sign`, `agate-encrypt`, `agate-decrypt` — GPG and YubiKey signing helpers.
+* `malachite`, `container`, `toggle-services`, `toggle-tor` — distrobox, container, and service management.
 
 ## Verification
 
-Images are signed with [cosign](https://github.com/sigstore/cosign). The public key is published at `https://os.fpt.icu/cosign.pub` and in this repo as [`cosign.pub`](cosign.pub).
+Images are signed with [cosign](https://github.com/sigstore/cosign). The public key is published at [`https://os.fpt.icu/cosign.pub`](https://os.fpt.icu/cosign.pub) and in this repo as [`cosign.pub`](cosign.pub).
 
 ```bash
 cosign verify --key cosign.pub quay.io/fptbb/agate
@@ -115,11 +114,11 @@ For more on this gem: [Red Fox Agate Overview](https://www.geologyin.com/2023/11
 
 This project is made possible by the work of the open-source community. Special thanks to:
 
-*   The [Universal Blue](https://universal-blue.org/) project and all its contributors.
-*   The [BlueBuild](https://blue-build.org/) project and all its contributors.
-*   Inspiration from other custom OS projects like [VeneOS](https://github.com/Venefilyn/veneos), [amyos](https://github.com/astrovm/amyos), and [m2os](https://github.com/m2Giles/m2os).
+* The [Universal Blue](https://universal-blue.org/) project and all its contributors.
+* The [BlueBuild](https://blue-build.org/) project and all its contributors.
+* Inspiration from other custom OS projects like [VeneOS](https://github.com/Venefilyn/veneos), [amyos](https://github.com/astrovm/amyos), and [m2os](https://github.com/m2Giles/m2os).
 * And **this community**:
-    ![Billions Must KDE](assets/bmk.png)
+  ![Billions Must KDE](assets/bmk.png)
 
 ## License
 
