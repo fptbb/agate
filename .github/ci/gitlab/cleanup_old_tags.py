@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class DockerV2Cleaner:
     def __init__(self):
         self.registry = os.environ.get("BB_REGISTRY", "quay.io")
-        namespace = os.environ.get("BB_REGISTRY_NAMESPACE")
+        namespace = os.environ.get("BB_REGISTRY_NAMESPACE", "fpsys")
         image = os.environ.get("IMAGE_NAME", "agate")
         self.repo = f"{namespace}/{image}"
         self.username = os.environ.get("BB_USERNAME")

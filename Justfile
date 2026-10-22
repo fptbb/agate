@@ -6,7 +6,7 @@ export git_branch := `git branch --show-current`
 username := "fptbb"
 image_name := "agate"
 image_tag := "latest"
-online_image := "quay.io/fptbb/agate:latest"
+online_image := "quay.io/fpsys/agate:latest"
 payload_ref := "localhost/payload:latest"
 iso_dest := "agate-live-amd64.iso"
 

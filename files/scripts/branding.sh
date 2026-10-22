@@ -20,7 +20,7 @@ esac
 OS_RELEASE="/usr/lib/os-release"
 IMAGE_INFO="/usr/share/ublue-os/image-info.json"
 
-IMAGE_REF="ostree-image-signed\:docker://quay.io/fptbb/agate"
+IMAGE_REF="ostree-image-signed\:docker://quay.io/fpsys/agate"
 IMAGE_TAG="$CHANNEL"
 IMAGE_BRANCH="$CHANNEL"
 

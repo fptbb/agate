@@ -80,7 +80,7 @@ toggle-services action target="all":
 malachite_json := "/usr/share/agate/malachite.json"
 
 malachite_images := if path_exists(malachite_json) == "true" { `jq -r '.images[].name' /usr/share/agate/malachite.json | xargs` } else { "fedora alpine" }
-malachite_repo := if path_exists(malachite_json) == "true" { `jq -r '.repo' /usr/share/agate/malachite.json` } else { "quay.io/fptbb/malachite" }
+malachite_repo := if path_exists(malachite_json) == "true" { `jq -r '.repo' /usr/share/agate/malachite.json` } else { "quay.io/fpsys/malachite" }
 malachite_link := if path_exists(malachite_json) == "true" { `jq -r '.link' /usr/share/agate/malachite.json` } else { "https://malachite.fpt.icu/" }
 
 # Execute Malachite operations

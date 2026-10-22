@@ -71,7 +71,7 @@ The ISO recipes expect a local `installer/` checkout (titanoboa provides it); th
 Switch an existing `bootc`-compatible system to this image:
 
 ```bash
-sudo rpm-ostree rebase ostree-unverified-registry:quay.io/fptbb/agate:latest
+sudo rpm-ostree rebase ostree-unverified-registry:quay.io/fpsys/agate:latest
 ```
 
 GitHub Container Registry works as a mirror:
@@ -99,7 +99,7 @@ After rebasing, `ujust --list` shows every available task. The main groups:
 Images are signed with [cosign](https://github.com/sigstore/cosign). The public key is published at [`https://os.fpt.icu/cosign.pub`](https://os.fpt.icu/cosign.pub) and in this repo as [`cosign.pub`](cosign.pub).
 
 ```bash
-cosign verify --key cosign.pub quay.io/fptbb/agate
+cosign verify --key cosign.pub quay.io/fpsys/agate
 ```
 
 ## Name Meaning
