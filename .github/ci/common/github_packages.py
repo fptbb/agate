@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import requests
 
-from scripts.common.utils import parse_iso_datetime
+from ci.common.utils import parse_iso_datetime
 
 
 logger = logging.getLogger(__name__)

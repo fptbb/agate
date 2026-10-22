@@ -3,15 +3,15 @@
 """Removes expired package versions from GitHub Packages.
 
 Backend-specific concerns -- listing versions and deleting them -- stay here.
-The retention decision is delegated to scripts.common.retention.
+The retention decision is delegated to ci.common.retention.
 """
 
 import logging
 import os
 import sys
 
-from scripts.common.github_packages import GitHubPackagesClient
-from scripts.common.retention import (
+from ci.common.github_packages import GitHubPackagesClient
+from ci.common.retention import (
     ALL_PROTECTED,
     ImageItem,
     digest_from_signature_tag,

@@ -4,7 +4,7 @@ import subprocess
 import time
 import shutil
 
-from scripts.common.utils import write_key_value_file
+from ci.common.utils import write_key_value_file
 
 def is_root():
     return os.geteuid() == 0

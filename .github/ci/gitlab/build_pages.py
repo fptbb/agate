@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 PUBLIC_DIR = REPO_ROOT / "public"
 PROJECT_PATH = os.environ.get("CI_PROJECT_PATH", "fpsys/agate")
 DEFAULT_BRANCH = os.environ.get("CI_DEFAULT_BRANCH", "main")

@@ -3,15 +3,15 @@
 """Removes expired tags from the Docker Registry v2 (Quay) mirror.
 
 Backend-specific concerns -- listing tags and deleting manifests -- stay here.
-The retention decision is delegated to scripts.common.retention.
+The retention decision is delegated to ci.common.retention.
 """
 
 import logging
 import os
 import sys
 
-from scripts.common.registry import DockerRegistryClient
-from scripts.common.retention import (
+from ci.common.registry import DockerRegistryClient
+from ci.common.retention import (
     LATEST_PROTECTED,
     ImageItem,
     digest_from_signature_tag,

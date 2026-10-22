@@ -40,9 +40,10 @@ jobs:
                   USERNAME: ${{ github.repository_owner }}
                   TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+                  PYTHONPATH: ${{ github.workspace }}/.github
               run: |
                   pip install requests
-                  python3 -m scripts.github.check_update
+                  python3 -m ci.github.check_update
 
     bluebuild:
         name: Build Custom Image
@@ -110,6 +111,7 @@ jobs:
 #                  TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #                  MAX_AGE_DAYS: "7"
 #                  MAX_KEEP: "5"
+#                  PYTHONPATH: ${{ github.workspace }}/.github
 #              run: |
 #                  pip install requests
-#                  python3 -m scripts.github.cleanup_old_tags
+#                  python3 -m ci.github.cleanup_old_tags

@@ -4,7 +4,7 @@
 
 This pipeline only publishes the latest channel -- recipe-testing.yml is built
 by GitHub Actions alone -- so only that channel is compared. The decision logic
-lives in scripts.common.update_check.
+lives in ci.common.update_check.
 """
 
 import logging
@@ -14,9 +14,9 @@ import ssl
 import sys
 from email.message import EmailMessage
 
-from scripts.common.registry import DockerRegistryClient
-from scripts.common.update_check import LATEST_ONLY, compare, recipes_to_build
-from scripts.common.utils import write_key_value_file
+from ci.common.registry import DockerRegistryClient
+from ci.common.update_check import LATEST_ONLY, compare, recipes_to_build
+from ci.common.utils import write_key_value_file
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

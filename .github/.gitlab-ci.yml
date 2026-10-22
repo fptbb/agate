@@ -21,7 +21,7 @@ workflow:
                   - files/**/*
                   - modules/**/*
                   - recipes/**/*
-                  - scripts/**/*
+                  - .github/ci/**/*
                   - .github/**/*
                   - .gitlab-ci.yml
                   - Justfile
@@ -36,7 +36,7 @@ workflow:
                   - files/**/*
                   - modules/**/*
                   - recipes/**/*
-                  - scripts/**/*
+                  - .github/ci/**/*
                   - .github/**/*
                   - .gitlab-ci.yml
                   - Justfile
@@ -68,6 +68,7 @@ variables:
     image: python:3-alpine
     before_script:
         - pip install requests
+        - export PYTHONPATH="$CI_PROJECT_DIR/.github"
 
 stages:
     - check
@@ -87,9 +88,10 @@ check-update:
             dotenv: build.env
     before_script:
         - dnf install -y python3 python3-requests python3-pyyaml
+        - export PYTHONPATH="$CI_PROJECT_DIR/.github"
     script:
-        - python3 -m scripts.gitlab.check_update
-        - python3 -m scripts.gitlab.check_package_updates
+        - python3 -m ci.gitlab.check_update
+        - python3 -m ci.gitlab.check_package_updates
 
 build-image:
     stage: build
@@ -192,8 +194,9 @@ pages:
         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     before_script:
         - apk add --no-cache git
+        - export PYTHONPATH="$CI_PROJECT_DIR/.github"
     script:
-        - python3 -m scripts.gitlab.build_pages
+        - python3 -m ci.gitlab.build_pages
     artifacts:
         paths:
             - public
@@ -223,4 +226,4 @@ cleanup-old-tags:
                 exit 0
               fi
             fi
-        - python3 -m scripts.gitlab.cleanup_old_tags
+        - python3 -m ci.gitlab.cleanup_old_tags

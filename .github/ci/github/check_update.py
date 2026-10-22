@@ -3,7 +3,7 @@
 """GitHub Actions update check.
 
 Fetches upstream/local tag dates via the shared helpers, then delegates the
-comparison to scripts.common.update_check. On a detected update it also nudges
+comparison to ci.common.update_check. On a detected update it also nudges
 the GitLab mirror by triggering a pipeline there.
 """
 
@@ -14,10 +14,10 @@ import sys
 
 import requests
 
-from scripts.common.github_packages import GitHubPackagesClient
-from scripts.common.registry import DockerRegistryClient
-from scripts.common.update_check import CHANNELS, compare, recipes_to_build
-from scripts.common.utils import write_key_value_file
+from ci.common.github_packages import GitHubPackagesClient
+from ci.common.registry import DockerRegistryClient
+from ci.common.update_check import CHANNELS, compare, recipes_to_build
+from ci.common.utils import write_key_value_file
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
