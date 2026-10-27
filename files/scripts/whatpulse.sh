@@ -12,7 +12,7 @@ fi
 # Set to 1 in PRIVATE builds that should grant the active desktop user access
 # to raw keyboard and mouse events. For public images, leave disabled and let
 # each machine opt in explicitly. This is a security-sensitive permission.
-WHATPULSE_ENABLE_INPUT_UACCESS="${WHATPULSE_ENABLE_INPUT_UACCESS:-0}"
+WHATPULSE_ENABLE_INPUT_UACCESS="${WHATPULSE_ENABLE_INPUT_UACCESS:-1}"
 case "$WHATPULSE_ENABLE_INPUT_UACCESS" in
   0|1) ;;
   *) echo 'ERROR: WHATPULSE_ENABLE_INPUT_UACCESS must be 0 or 1.' >&2; exit 1 ;;
