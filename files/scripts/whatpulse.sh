@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# BlueBuild: files/scripts/whatpulse-pcap.sh (track latest release)
 # Installs WhatPulse External PCap Service into the immutable /usr tree.
 set -euo pipefail
 
@@ -6,6 +7,16 @@ if (( EUID != 0 )); then
   echo 'ERROR: This script must run as root during the BlueBuild image build.' >&2
   exit 1
 fi
+
+# Input monitoring is independent from the network PCap service.
+# Set to 1 in PRIVATE builds that should grant the active desktop user access
+# to raw keyboard and mouse events. For public images, leave disabled and let
+# each machine opt in explicitly. This is a security-sensitive permission.
+WHATPULSE_ENABLE_INPUT_UACCESS="${WHATPULSE_ENABLE_INPUT_UACCESS:-0}"
+case "$WHATPULSE_ENABLE_INPUT_UACCESS" in
+  0|1) ;;
+  *) echo 'ERROR: WHATPULSE_ENABLE_INPUT_UACCESS must be 0 or 1.' >&2; exit 1 ;;
+esac
 
 # Follow GitHub's latest non-prerelease release on every image build.
 # This is a floating version, not a reproducible version pin.
@@ -126,6 +137,30 @@ install -D -o root -g root -m 0644 \
   "$source_dir/LICENSE" \
   /usr/share/licenses/whatpulse-pcap-service/LICENSE
 
+# Ship an opt-in udev rule template in /usr. It is intentionally not active
+# by default, because any process owned by the active seat user could read
+# raw keystrokes once these ACLs are granted. Keep the rule before systemd's
+# 73-seat-late.rules, which applies the uaccess ACL.
+install -d -m 0755 /usr/share/whatpulse-pcap-service
+cat > /usr/share/whatpulse-pcap-service/70-whatpulse-input.rules <<'UDEV'
+# WhatPulse raw input access for active local sessions (systemd-logind).
+# WARNING: grants access to *all* applications running as that user.
+# Avoid MODE="0666", GROUP="input", and chmod on /dev/input/event*.
+ACTION=="add|change", SUBSYSTEM=="input", KERNEL=="event[0-9]*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"
+ACTION=="add|change", SUBSYSTEM=="input", KERNEL=="event[0-9]*", ENV{ID_INPUT_KEY}=="1", TAG+="uaccess"
+ACTION=="add|change", SUBSYSTEM=="input", KERNEL=="event[0-9]*", ENV{ID_INPUT_MOUSE}=="1", TAG+="uaccess"
+ACTION=="add|change", SUBSYSTEM=="input", KERNEL=="event[0-9]*", ENV{ID_INPUT_TOUCHPAD}=="1", TAG+="uaccess"
+UDEV
+chmod 0644 /usr/share/whatpulse-pcap-service/70-whatpulse-input.rules
+if [[ "$WHATPULSE_ENABLE_INPUT_UACCESS" == 1 ]]; then
+  install -D -m 0644 \
+    /usr/share/whatpulse-pcap-service/70-whatpulse-input.rules \
+    /usr/lib/udev/rules.d/70-whatpulse-input.rules
+  echo 'WARNING: Enabled active-seat access to raw keyboard and mouse devices.' >&2
+else
+  echo 'WhatPulse input monitoring: udev rule available, opt-in required.'
+fi
+
 # The upstream application checks geteuid() == 0, so a non-root systemd
 # User= is not supported without patching the C++ source. Drop almost all
 # privileges and allow only the two network capabilities used upstream.
@@ -191,3 +226,6 @@ if ldd /usr/bin/whatpulse-pcap-service | grep -q 'not found'; then
 fi
 /usr/bin/whatpulse-pcap-service --version
 printf '%s\n' 'WhatPulse PCap Service installed in /usr. Enable it with the BlueBuild systemd module.'
+if [[ "$WHATPULSE_ENABLE_INPUT_UACCESS" == 0 ]]; then
+  printf '%s\n' 'To enable input access on a booted machine: sudo install -Dm644 /usr/share/whatpulse-pcap-service/70-whatpulse-input.rules /etc/udev/rules.d/70-whatpulse-input.rules'
+fi
