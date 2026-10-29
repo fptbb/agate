@@ -9,6 +9,14 @@
     {
       "name": "alpine",
       "pretty_name": "Alpine"
+    },
+    {
+      "name": "ubuntu",
+      "pretty_name": "Ubuntu"
+    },
+    {
+      "name": "almalinux",
+      "pretty_name": "AlmaLinux"
     }
   ]
 }

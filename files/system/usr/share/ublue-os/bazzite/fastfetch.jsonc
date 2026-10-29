@@ -34,10 +34,17 @@
         //     "key": " 󱋩",
         //     "text": "/usr/libexec/bazzite-fetch-image"
         // },
+        // {
+        //     "type": "os",
+        //     "key": " 󰣛",
+        //     "format": "{pretty-name}"
+        // },
+
         {
-            "type": "os",
+            "type": "command",
             "key": " 󰣛",
-            "format": "{pretty-name}"
+            "text": "ref=$(rpm-ostree status --json | jq -r '.deployments[] | select(.booted) | .[\"container-image-reference\"] // .origin // empty'); case \"$ref\" in *:testing) echo 'Agate:testing' ;; *) echo 'Agate' ;; esac",
+            "useOutput": "stdout"
         },
         {
             "type": "kernel",
@@ -48,10 +55,16 @@
             "type": "uptime",
             "key": " 󰅐"
         },
+        // {
+        //     "type": "command",
+        //     "key": " ",
+        //     "text": "date -d$(ls -alct /var/log --time-style=full-iso|tail -1|awk '{print $6}') +'Installed on %b %d %G'",
+        //     "shell": "/bin/bash"
+        // },
         {
             "type": "command",
             "key": " ",
-            "text": "date -d$(ls -alct /var/log --time-style=full-iso|tail -1|awk '{print $6}') +'Installed on %b %d %G'",
+            "text": "installed=$(ls -alct /var/log --time-style=full-iso | tail -1 | awk '{print $6}'); start=$(date -d \"$installed\" +%Y-%m-%d); years=$(($(date +%Y) - $(date -d \"$start\" +%Y))); months=$(($(date +%-m) - $(date -d \"$start\" +%-m))); days=$(($(date +%-d) - $(date -d \"$start\" +%-d))); if (( days < 0 )); then months=$((months - 1)); days=$((days + $(date -d \"$(date +%Y-%m-01) -1 day\" +%d))); fi; if (( months < 0 )); then years=$((years - 1)); months=$((months + 12)); fi; parts=(); for unit in year month day; do case $unit in year) n=$years;; month) n=$months;; day) n=$days;; esac; if (( n > 0 )); then suffix=''; (( n != 1 )) && suffix='s'; parts+=(\"$n $unit$suffix\"); fi; done; count=${#parts[@]}; if (( count == 0 )); then result='0 days'; elif (( count == 1 )); then result=${parts[0]}; else last=${parts[count-1]}; unset 'parts[count-1]'; result=$(printf '%s, ' \"${parts[@]}\"); result=\"${result%, } and $last\"; fi; printf 'Installed for %s\\n' \"$result\"",
             "shell": "/bin/bash"
         },
         "break",
@@ -118,13 +131,6 @@
         "key": " ",
         "text": "/usr/bin/agate-get-packages distrobox",
         "shell": "/bin/bash"
-        },
-        "break",
-
-        {
-            "type": "colors",
-            "paddingLeft": 2,
-            "symbol": "circle"
         }
     ]
 }
