@@ -15,17 +15,20 @@ modules:
       - |
         set -eu
 
-        echo "=== Removing Bazzite KDE version locks ==="
+        echo "=== Unlocking KDE ==="
         dnf5 versionlock delete 'plasma-*' 'qt6-*'
 
-        echo "=== Upgrading KDE Plasma, Qt 6 and Frameworks ==="
-        dnf5 -y --refresh upgrade \
+        echo "=== Upgrading KDE ==="
+        dnf5 -y --refresh --best upgrade \
           'plasma-*' \
           'qt6-*' \
           'kf6-*' \
           'kwin*' \
           'libplasma*' \
           'kde-*'
+
+        echo "=== Installed versions ==="
+        rpm -q plasma-desktop plasma-workspace kwin
 
   # Shared modules; see recipes/common-modules.yml
   - from-file: common-modules.yml
