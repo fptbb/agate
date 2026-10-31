@@ -15,29 +15,27 @@ modules:
       - |
         set -euo pipefail
 
-        echo "=== Existing KDE version locks ==="
-        dnf5 versionlock list
-
-        echo "=== Removing KDE Plasma and Qt 6 version locks ==="
-        rpm -qa --qf '%{NAME}\n' \
-          | grep -E '^(plasma-|qt6-)' \
-          | sort -u \
-          | xargs -r dnf5 versionlock delete
-
-        echo "=== Remaining version locks ==="
-        dnf5 versionlock list
-
-        echo "=== Upgrading KDE ==="
-        dnf5 -y --refresh --best upgrade \
-          'plasma-*' \
-          'qt6-*' \
-          'kf6-*' \
-          'kwin*' \
-          'libplasma*' \
-          'kde-*'
-
-        echo "=== Installed versions ==="
+        echo "=== KDE versions ==="
         rpm -q plasma-desktop plasma-workspace kwin
+
+        echo "=== Main DNF exclusions ==="
+        dnf5 --dump-main-config \
+          | grep -Ei 'exclude|include' || true
+
+        echo "=== Fedora repository exclusions ==="
+        dnf5 --dump-repo-config=fedora,updates \
+          | grep -Ei '^\[|exclude|include|priority' || true
+
+        echo "=== Remaining KDE version locks ==="
+        dnf5 versionlock list \
+          | grep -E '^Package name: (plasma-|qt6-)' || true
+
+        echo "=== Testing without versionlock plugin ==="
+        dnf5 --disable-plugin=versionlock \
+          --refresh --best --assumeno upgrade \
+          plasma-workspace \
+          plasma-workspace-common \
+          plasma-workspace-libs
 
   # Shared modules; see recipes/common-modules.yml
   - from-file: common-modules.yml
