@@ -23,7 +23,6 @@ modules:
         - libfido2 # fido2 library for u2f support in browsers and other applications
         - fido2-tools # command line tools for fido2 devices
         - gnupg2 # openpgp encryption and signing tools
-        - veracrypt # disk encryption software based on truecrypt
         - fuse-encfs # encrypted filesystem support via fuse
         - kleopatra # gpg key manager and certificate manager
 
@@ -77,6 +76,9 @@ modules:
 
         # Development & Programming
         - code # Visual Studio Code, from the Microsoft repo added above
+
+        # Security & Authentication
+        - veracrypt # disk encryption software based on truecrypt
   - type: script
     scripts:
       - fido2.sh
