@@ -1,6 +1,12 @@
 # yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
 
 modules:
+  - type: script
+    snippets:
+      - |
+        echo "=== Unlocking KDE Plasma and Qt 6 ==="
+        dnf5 versionlock delete 'plasma-*' 'qt6-*'
+        dnf5 versionlock list
   - type: dnf
     repos:
       cleanup: true
