@@ -13,10 +13,19 @@ modules:
   - type: script
     snippets:
       - |
-        set -eu
+        set -euo pipefail
 
-        echo "=== Unlocking KDE ==="
-        dnf5 versionlock delete 'plasma-*' 'qt6-*'
+        echo "=== Existing KDE version locks ==="
+        dnf5 versionlock list
+
+        echo "=== Removing KDE Plasma and Qt 6 version locks ==="
+        rpm -qa --qf '%{NAME}\n' \
+          | grep -E '^(plasma-|qt6-)' \
+          | sort -u \
+          | xargs -r dnf5 versionlock delete
+
+        echo "=== Remaining version locks ==="
+        dnf5 versionlock list
 
         echo "=== Upgrading KDE ==="
         dnf5 -y --refresh --best upgrade \
