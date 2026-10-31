@@ -13,9 +13,19 @@ modules:
   - type: script
     snippets:
       - |
-        echo "=== Unlocking KDE Plasma and Qt 6 ==="
+        set -eu
+
+        echo "=== Removing Bazzite KDE version locks ==="
         dnf5 versionlock delete 'plasma-*' 'qt6-*'
-        dnf5 versionlock list
+
+        echo "=== Upgrading KDE Plasma, Qt 6 and Frameworks ==="
+        dnf5 -y --refresh upgrade \
+          'plasma-*' \
+          'qt6-*' \
+          'kf6-*' \
+          'kwin*' \
+          'libplasma*' \
+          'kde-*'
 
   # Shared modules; see recipes/common-modules.yml
   - from-file: common-modules.yml
