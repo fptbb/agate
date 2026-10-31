@@ -9,6 +9,14 @@ alt-tags:
   - testing
 
 modules:
+  # Unlock KDE and QT packages to allow for newer versions than the base image provides.
+  - type: script
+    snippets:
+      - |
+        echo "=== Unlocking KDE Plasma and Qt 6 ==="
+        dnf5 versionlock delete 'plasma-*' 'qt6-*'
+        dnf5 versionlock list
+
   # Shared modules; see recipes/common-modules.yml
   - from-file: common-modules.yml
 
