@@ -37,7 +37,7 @@ modules:
         - kf6-kwallet
         - pam-kwallet
         - kwalletmanager
-        - qt5ct
+        # - qt5ct
         - qt6ct
         - kvantum
         - xdg-desktop-portal-gtk
