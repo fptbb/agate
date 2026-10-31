@@ -15,27 +15,61 @@ modules:
       - |
         set -euo pipefail
 
-        echo "=== KDE versions ==="
+        echo "=== Removing KDE and Qt 6 version locks ==="
+
+        python3 - <<'PY'
+        from pathlib import Path
+        import re
+
+        path = Path("/etc/dnf/versionlock.toml")
+        content = path.read_text()
+
+        sections = re.split(
+            r"(?=^\[\[packages\]\][ \t]*$)",
+            content,
+            flags=re.MULTILINE,
+        )
+
+        kept = [sections[0]]
+        removed = []
+
+        for section in sections[1:]:
+            match = re.search(
+                r'^name\s*=\s*"([^"]+)"',
+                section,
+                flags=re.MULTILINE,
+            )
+            if not match:
+                raise ValueError("Unrecognized versionlock entry")
+
+            name = match.group(1)
+
+            if name.startswith(("plasma-", "qt6-")):
+                removed.append(name)
+            else:
+                kept.append(section)
+
+        path.write_text("".join(kept))
+        print(f"Removed {len(removed)} KDE/Qt version locks")
+        PY
+
+        echo "=== Verifying remaining KDE locks ==="
+        if dnf5 versionlock list | grep -E '^Package name: (plasma-|qt6-)'; then
+          echo "ERROR: KDE/Qt version locks remain"
+          exit 1
+        fi
+
+        echo "=== Upgrading KDE Plasma ==="
+        dnf5 -y --refresh --best upgrade \
+          'plasma-*' \
+          'qt6-*' \
+          'kf6-*' \
+          'kwin*' \
+          'libplasma*' \
+          'kde-*'
+
+        echo "=== Installed KDE versions ==="
         rpm -q plasma-desktop plasma-workspace kwin
-
-        echo "=== Main DNF exclusions ==="
-        dnf5 --dump-main-config \
-          | grep -Ei 'exclude|include' || true
-
-        echo "=== Fedora repository exclusions ==="
-        dnf5 --dump-repo-config=fedora,updates \
-          | grep -Ei '^\[|exclude|include|priority' || true
-
-        echo "=== Remaining KDE version locks ==="
-        dnf5 versionlock list \
-          | grep -E '^Package name: (plasma-|qt6-)' || true
-
-        echo "=== Testing without versionlock plugin ==="
-        dnf5 --disable-plugin=versionlock \
-          --refresh --best --assumeno upgrade \
-          plasma-workspace \
-          plasma-workspace-common \
-          plasma-workspace-libs
 
   # Shared modules; see recipes/common-modules.yml
   - from-file: common-modules.yml
