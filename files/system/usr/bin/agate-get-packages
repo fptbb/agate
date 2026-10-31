@@ -7,10 +7,24 @@ MODE="${1:-all}"
 # Note: Directory permissions are managed via /usr/lib/tmpfiles.d/agate.conf
 CACHE_FILE="/var/lib/agate/package-counts.json"
 
-# ensure cache exists with defaults (silently fail if directory doesn't exist)
+# Load image index (prefer the copy generated at build time).
+if [[ -f /usr/share/agate/malachite.json ]] && jq -e '.images | type == "object"' /usr/share/agate/malachite.json >/dev/null 2>&1; then
+    IMG_JSON=$(cat /usr/share/agate/malachite.json)
+else
+    IMG_JSON=$(curl -fsSL https://malachite.fpt.icu/images.json 2>/dev/null || echo '{"images":{}}')
+fi
+
+# Image ids and their package managers.
+IMAGE_IDS=$(echo "$IMG_JSON" | jq -r '.images | keys[]' 2>/dev/null)
+declare -A IMG_MANAGER
+for id in $IMAGE_IDS; do
+    IMG_MANAGER[$id]=$(echo "$IMG_JSON" | jq -r --arg id "$id" '.images[$id].manager')
+done
+
+# ensure cache exists with defaults
 if [[ ! -f "$CACHE_FILE" ]]; then
     if [[ -w "$(dirname "$CACHE_FILE")" ]]; then
-        echo '{"fedora": 0, "alpine": 0}' > "$CACHE_FILE" 2>/dev/null || true
+        echo '{}' > "$CACHE_FILE" 2>/dev/null || true
     fi
 fi
 
@@ -26,7 +40,6 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 # 2. Get Podman containers status once (Background)
 (
-    # format: name|status
     podman ps -a --filter "label=manager=distrobox" --format '{{.Names}}|{{.Status}}' 2>/dev/null > "$TMP_DIR/containers"
 ) &
 
@@ -38,33 +51,40 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 # Wait for container list and fastfetch to be ready
 wait $! 2>/dev/null
 
-# Load last known counts from cache (silently fallback to 0)
-FEDORA_LAST=$(jq -r '.fedora // 0' "$CACHE_FILE" 2>/dev/null || echo 0)
-ALPINE_LAST=$(jq -r '.alpine // 0' "$CACHE_FILE" 2>/dev/null || echo 0)
+# Load last known counts from cache.
+declare -A CACHED_COUNT
+for id in $IMAGE_IDS; do
+    CACHED_COUNT[$id]=$(jq -r --arg id "$id" '.[$id] // 0' "$CACHE_FILE" 2>/dev/null || echo 0)
+done
 
-# Process containers in parallel
+# Process containers.
 if [[ -f "$TMP_DIR/containers" ]]; then
-    while IFS="|" read -r name status; do
-        if [[ "$name" == "fedora" ]]; then
-            (
-                if [[ "$status" == Up* ]]; then
-                    count=$(podman exec fedora rpm -qa 2>/dev/null | wc -l)
-                    echo "$count" > "$TMP_DIR/fedora_count"
-                else
-                    echo "$FEDORA_LAST" > "$TMP_DIR/fedora_count"
-                fi
-            ) &
-        elif [[ "$name" == "alpine" ]]; then
-            (
-                if [[ "$status" == Up* ]]; then
-                    count=$(podman exec alpine apk info 2>/dev/null | wc -l)
-                    echo "$count" > "$TMP_DIR/alpine_count"
-                else
-                    echo "$ALPINE_LAST" > "$TMP_DIR/alpine_count"
-                fi
-            ) &
+    for id in $IMAGE_IDS; do
+        status=$(grep "^${id}|" "$TMP_DIR/containers" 2>/dev/null | head -1 | cut -d'|' -f2)
+        if [[ -n "$status" ]]; then
+            if [[ "$status" == Up* ]]; then
+                manager="${IMG_MANAGER[$id]}"
+                (
+                    case "$manager" in
+                        apk)
+                            count=$(podman exec "$id" apk info 2>/dev/null | wc -l)
+                            ;;
+                        apt)
+                            count=$(podman exec "$id" sh -c "dpkg -l 2>/dev/null | grep -c '^ii'" 2>/dev/null)
+                            ;;
+                        *)
+                            count=$(podman exec "$id" rpm -qa 2>/dev/null | wc -l)
+                            ;;
+                    esac
+                    echo "${count:-0}" > "$TMP_DIR/count_$id"
+                ) &
+            else
+                echo "${CACHED_COUNT[$id]:-0}" > "$TMP_DIR/count_$id"
+            fi
+        else
+            echo "${CACHED_COUNT[$id]:-0}" > "$TMP_DIR/count_$id"
         fi
-    done < "$TMP_DIR/containers"
+    done
 fi
 
 # Wait for everything
@@ -72,52 +92,58 @@ wait
 
 # Collect results
 appimg=$(cat "$TMP_DIR/appimg" 2>/dev/null || echo 0)
-fedora_count=$(cat "$TMP_DIR/fedora_count" 2>/dev/null || echo 0)
-alpine_count=$(cat "$TMP_DIR/alpine_count" 2>/dev/null || echo 0)
 fastfetch_json=$(cat "$TMP_DIR/fastfetch" 2>/dev/null || echo "[]")
 
-# Update cache if counts changed and are valid (>0)
-if [[ "$fedora_count" -gt 0 || "$alpine_count" -gt 0 ]]; then
-    # merge new counts into cache (silently skip if directory is not writable)
-    if [[ -w "$(dirname "$CACHE_FILE")" ]]; then
-        if jq -n --arg f "$fedora_count" --arg a "$alpine_count" \
-           --argjson last_f "$FEDORA_LAST" --argjson last_a "$ALPINE_LAST" \
-           '{fedora: (if ($f|tonumber) > 0 then ($f|tonumber) else $last_f end), 
-             alpine: (if ($a|tonumber) > 0 then ($a|tonumber) else $last_a end)}' \
-           > "$CACHE_FILE.tmp" 2>/dev/null; then
-            mv "$CACHE_FILE.tmp" "$CACHE_FILE" 2>/dev/null
-        fi || true
+declare -A COUNTS
+for id in $IMAGE_IDS; do
+    COUNTS[$id]=$(cat "$TMP_DIR/count_$id" 2>/dev/null || echo "${CACHED_COUNT[$id]:-0}")
+    # fallback if file missing
+    [[ -z "${COUNTS[$id]}" ]] && COUNTS[$id]="${CACHED_COUNT[$id]:-0}"
+done
+
+# Update cache if any count changed and is valid (>0)
+if [[ -w "$(dirname "$CACHE_FILE")" ]]; then
+    cache_json='{}'
+    updated=0
+    for id in $IMAGE_IDS; do
+        count="${COUNTS[$id]:-0}"
+        last="${CACHED_COUNT[$id]:-0}"
+        if [[ "$count" -gt 0 ]]; then
+            new="$count"
+            updated=1
+        else
+            new="$last"
+        fi
+        cache_json=$(echo "$cache_json" | jq --arg id "$id" --argjson c "$new" '.[$id]=$c')
+    done
+    if [[ "$updated" -eq 1 ]]; then
+        echo "$cache_json" > "$CACHE_FILE.tmp" 2>/dev/null && mv "$CACHE_FILE.tmp" "$CACHE_FILE" 2>/dev/null || true
     fi
 fi
 
-# Final processing with jq
-echo "$fastfetch_json" | jq -r \
-  --arg app "$appimg" \
-  --arg fedora "$fedora_count" \
-  --arg alpine "$alpine_count" \
-  --arg mode "$MODE" '
-  .[0].result as $r |
-  if $r == null then empty else
+# Parse fastfetch host packages.
+read -r nix brew flatpak < <(echo "$fastfetch_json" | jq -r '
+  (.[0].result // {}) as $r |
+  [($r.nixUser // 0)+($r.nixDefault // 0)+($r.nix // 0),
+   ($r.brew // 0)+($r.brewCask // 0),
+   ($r.flatpakSystem // 0)+($r.flatpakUser // 0)+($r.flatpak // 0)] | @tsv
+' 2>/dev/null)
+nix=${nix:-0}; brew=${brew:-0}; flatpak=${flatpak:-0}
 
-  ($r.rpm // 0) as $rpm |
-  (($r.nixUser // 0) + ($r.nixDefault // 0) + ($r.nix // 0)) as $nix |
-  (($r.brew // 0) + ($r.brewCask // 0)) as $brew |
-  (($r.flatpakSystem // 0) + ($r.flatpakUser // 0) + ($r.flatpak // 0)) as $ftpk |
-  ($app | tonumber) as $appNum |
-  ($fedora | tonumber) as $fedoraNum |
-  ($alpine | tonumber) as $alpineNum |
+# Build output.
+parts=()
+if [[ "$MODE" == "all" || "$MODE" == "host" ]]; then
+    [[ "$nix" -gt 0 ]] && parts+=("$nix (nix)")
+    [[ "$brew" -gt 0 ]] && parts+=("$brew (brew)")
+    [[ "$flatpak" -gt 0 ]] && parts+=("$flatpak (ftpk)")
+    [[ "$appimg" -gt 0 ]] && parts+=("$appimg (appimg)")
+fi
+if [[ "$MODE" == "all" || "$MODE" == "distrobox" ]]; then
+    for id in $IMAGE_IDS; do
+        count="${COUNTS[$id]:-0}"
+        [[ "$count" -gt 0 ]] && parts+=("$count (malachite-$id)")
+    done
+fi
 
-  [
-    (if $mode == "all" or $mode == "host" then
-        (if $nix > 0 then "\($nix) (nix)" else empty end),
-        (if $brew > 0 then "\($brew) (brew)" else empty end),
-        (if $ftpk > 0 then "\($ftpk) (ftpk)" else empty end),
-        (if $appNum > 0 then "\($appNum) (appimg)" else empty end)
-    else empty end),
-    (if $mode == "all" or $mode == "distrobox" then
-        (if $fedoraNum > 0 then "\($fedoraNum) (malachite-fedora)" else empty end),
-        (if $alpineNum > 0 then "\($alpineNum) (malachite-alpine)" else empty end)
-    else empty end)
-  ] | join(", ")
-  end
-' 2>/dev/null || true
+IFS=', '
+echo "${parts[*]}"

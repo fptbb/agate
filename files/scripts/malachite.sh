@@ -5,20 +5,20 @@ log() {
     echo "=== $* ==="
 }
 
+URL="https://malachite.fpt.icu/images.json"
 CONFIG="/usr/share/agate/malachite.json"
 
-if [[ ! -f "$CONFIG" ]]; then
-    echo "Error: Malachite config not found at $CONFIG"
-    exit 1
-fi
+echo "Fetching Malachite image index..."
 
-IMAGES=$(jq -c '.images[]' "$CONFIG")
+mkdir -p "$(dirname "$CONFIG")"
+curl -fsSL "$URL" -o "$CONFIG"
+
+IMAGES=$(jq -r '.images | keys[]' "$CONFIG")
 
 echo "Generating Malachite Desktop Launchers..."
 
-for img in $IMAGES; do
-    NAME=$(echo "$img" | jq -r '.name')
-    PRETTY=$(echo "$img" | jq -r '.pretty_name')
+for NAME in $IMAGES; do
+    PRETTY=$(jq -r --arg n "$NAME" '.images[$n].title' "$CONFIG")
 
     cat <<DESK > "/usr/share/applications/malachite-$NAME.desktop"
 [Desktop Entry]

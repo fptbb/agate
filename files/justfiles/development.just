@@ -79,9 +79,9 @@ toggle-services action target="all":
 # Malachite Configuration
 malachite_json := "/usr/share/agate/malachite.json"
 
-malachite_images := if path_exists(malachite_json) == "true" { `jq -r '.images[].name' /usr/share/agate/malachite.json | xargs` } else { "fedora alpine" }
-malachite_repo := if path_exists(malachite_json) == "true" { `jq -r '.repo' /usr/share/agate/malachite.json` } else { "quay.io/fpsys/malachite" }
-malachite_link := if path_exists(malachite_json) == "true" { `jq -r '.link' /usr/share/agate/malachite.json` } else { "https://malachite.fpt.icu/" }
+malachite_images := `curl -fsSL https://malachite.fpt.icu/images.json | jq -r '.images | keys[]' | xargs`
+malachite_repo := `curl -fsSL https://malachite.fpt.icu/images.json | jq -r '"\(.registry)/\(.namespace)/\(.image_name)"'`
+malachite_link := "https://malachite.fpt.icu/"
 
 # Execute Malachite operations
 [group("system")]
@@ -107,8 +107,9 @@ malachite action="" image="":
         # routes the requested action to the corresponding distrobox operation
         case $ACTION in
             apply)
+                assemble=$(curl -fsSL https://malachite.fpt.icu/images.json | jq -r --arg img "$img" '.images[$img].assemble')
                 echo "Applying configuration for malachite-$img..."
-                distrobox assemble create --replace --file "{{ malachite_link }}$img.ini"
+                distrobox assemble create --replace --file "{{ malachite_link }}$assemble"
                 ;;
             update)
                 echo "Updating malachite-$img..."
