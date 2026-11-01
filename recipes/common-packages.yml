@@ -47,6 +47,7 @@ modules:
         # Miscellaneous / Other
         - cairo-devel # 2D graphics library for vector graphics and image rendering
         - dejavu-sans-fonts # open source font family based on the Vera Sans typeface
+        - librsvg2-tools # command line tools for converting and manipulating SVG files
   # Install packages that may not be working and so do with skip-unavailable and skip-broken to avoid breaking the build
   - type: dnf
     repos:
