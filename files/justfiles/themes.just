@@ -1,3 +1,5 @@
+set lazy
+
 # manages all theme components
 agate-manage-themes: agate-install-catppuccin agate-install-kora agate-install-plasmusic
     @echo "Theme installation complete."

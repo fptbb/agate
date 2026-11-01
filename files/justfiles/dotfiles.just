@@ -1,3 +1,5 @@
+set lazy
+
 # defines global configuration with environment variable fallbacks
 
 HOME_DIR := env_var("HOME")

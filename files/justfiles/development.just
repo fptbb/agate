@@ -1,3 +1,5 @@
+set lazy
+
 # Install DevBox
 [group("system")]
 agate-devbox:
