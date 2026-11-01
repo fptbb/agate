@@ -12,6 +12,7 @@ modules:
     validate: true
     include:
       - themes.just
+      - entertainment.just
   - type: script
     scripts:
       - theming.sh
