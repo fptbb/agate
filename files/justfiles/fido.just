@@ -1,5 +1,3 @@
-set lazy
-
 # Agate OS YubiKey and LUKS Management
 #
 # BlueBuild Image Requirements (recipe.yml):

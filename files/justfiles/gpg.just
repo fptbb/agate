@@ -1,5 +1,3 @@
-set lazy
-
 # Agate OS GPG and YubiKey Utilities
 # default key id for operations. override via cli if needed.
 
