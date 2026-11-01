@@ -140,9 +140,22 @@ ICONS="/usr/share/icons/hicolor"
 APPS="${ICONS}/scalable/apps"
 PLACES="${ICONS}/scalable/places"
 
+# Restore branding assets from BlueBuild's mounted build files.
+# This also prevents stale or missing files from affecting either channel.
+ARTWORK_SOURCE="/tmp/files/system/usr/share/pixmaps"
+
 for name in agate-logo.svg agate-logo-le.svg agate-logo-white.svg; do
-    if [[ ! -s "$PIXMAPS/$name" ]]; then
-        log "Required Agate artwork missing: $PIXMAPS/$name"
+    source="${ARTWORK_SOURCE}/${name}"
+    target="${PIXMAPS}/${name}"
+
+    if [[ -s "$source" ]]; then
+        install -Dm644 "$source" "$target"
+        log "Installed artwork: $name"
+    elif [[ -s "$target" ]]; then
+        log "Using existing artwork: $name"
+    else
+        log "Required Agate artwork missing: $name"
+        log "Checked: $source and $target"
         exit 1
     fi
 done
