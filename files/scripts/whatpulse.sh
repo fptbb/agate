@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# BlueBuild: files/scripts/whatpulse-pcap.sh (track latest release)
-# Installs WhatPulse External PCap Service into the immutable /usr tree.
+# BlueBuild: files/scripts/whatpulse-pcap.sh (latest upstream RPM)
+# Installs the upstream x86_64 RPM into the immutable /usr tree.
 set -euo pipefail
 
 if (( EUID != 0 )); then
@@ -31,7 +31,7 @@ else
   exit 1
 fi
 
-for cmd in curl sha256sum tar rpm install ldd python3; do
+for cmd in curl sha256sum rpm install ldd python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "ERROR: Missing required command: ${cmd}" >&2
     exit 1
@@ -41,7 +41,8 @@ done
 workdir="$(mktemp -d)"
 trap 'rm -rf -- "$workdir"' EXIT
 
-# Look up the latest stable release and get the digest for its SOURCE asset.
+# GitHub's /releases/latest endpoint excludes drafts and prereleases.
+# Resolve exactly one x86_64 RPM for the release tag; never guess a URL.
 curl --fail --location --silent --show-error \
   --retry 3 --connect-timeout 15 --max-time 60 \
   --header 'Accept: application/vnd.github+json' \
@@ -58,35 +59,31 @@ with open(sys.argv[1], encoding="utf-8") as file:
 tag = release.get("tag_name", "")
 if not isinstance(tag, str) or not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
     sys.exit("ERROR: Latest release has an unexpected version tag")
+if release.get("draft") or release.get("prerelease"):
+    sys.exit("ERROR: The returned release is not stable")
 
 version = tag[1:]
-# The filename's version can lag behind the release tag (e.g. v1.5.2
-# published with whatpulse-pcap-service-1.5.1-source.tar.gz).
-source_pattern = re.compile(
-    r"whatpulse-pcap-service-([0-9]+\.[0-9]+\.[0-9]+)-source\.tar\.gz"
+# Match the RPM's release number without relying on it always being '-1'.
+# The package version itself must agree with the GitHub release tag.
+rpm_pattern = re.compile(
+    rf"whatpulse-pcap-service-{re.escape(version)}-[0-9]+"
+    r"(?:\.[A-Za-z0-9_]+)*\.x86_64\.rpm"
 )
 assets = [
     asset for asset in release.get("assets", [])
-    if isinstance(asset.get("name"), str)
-    and source_pattern.fullmatch(asset["name"])
+    if isinstance(asset, dict)
+    and isinstance(asset.get("name"), str)
+    and rpm_pattern.fullmatch(asset["name"])
     and asset.get("state") == "uploaded"
 ]
 if len(assets) != 1:
-    sys.exit(f"ERROR: Expected exactly one source archive; found {len(assets)}")
+    sys.exit(f"ERROR: Expected exactly one x86_64 RPM for {tag}; found {len(assets)}")
 
 asset = assets[0]
 filename = asset["name"]
-archive_version = source_pattern.fullmatch(filename).group(1)
-if archive_version != version:
-    print(
-        f"WARNING: Release {tag} contains source archive labeled "
-        f"{archive_version}; using the published asset.",
-        file=sys.stderr,
-    )
-
 digest = asset.get("digest", "")
 if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest):
-    sys.exit("ERROR: The source asset is missing its GitHub SHA-256 digest")
+    sys.exit("ERROR: The RPM asset is missing its GitHub SHA-256 digest")
 
 url = asset.get("browser_download_url", "")
 expected = (
@@ -94,8 +91,9 @@ expected = (
     f"releases/download/{tag}/{filename}"
 )
 if url != expected:
-    sys.exit("ERROR: Unexpected source asset download URL")
+    sys.exit("ERROR: Unexpected RPM asset download URL")
 
+print(tag)
 print(version)
 print(filename)
 print(digest.partition(":")[2].lower())
@@ -103,58 +101,56 @@ print(url)
 PYRELEASE
 
 mapfile -t release_fields < "$workdir/release-fields"
-VERSION="${release_fields[0]}"
-ARCHIVE="${release_fields[1]}"
-SOURCE_SHA256="${release_fields[2]}"
-URL="${release_fields[3]}"
+TAG="${release_fields[0]}"
+VERSION="${release_fields[1]}"
+RPM_FILE="${release_fields[2]}"
+RPM_SHA256="${release_fields[3]}"
+URL="${release_fields[4]}"
 
-printf 'Downloading WhatPulse PCap Service %s (asset: %s)...\n' "$VERSION" "$ARCHIVE"
+# Upstream only publishes prebuilt x86_64 RPMs at present.
+if [[ "$(rpm --eval '%{_arch}')" != x86_64 ]]; then
+  echo 'ERROR: The upstream WhatPulse RPM is currently available only for x86_64.' >&2
+  exit 1
+fi
+
+printf 'Downloading WhatPulse PCap Service %s (%s)...\n' "$VERSION" "$RPM_FILE"
 curl --fail --location --silent --show-error \
   --retry 3 --connect-timeout 15 --max-time 180 \
-  --output "$workdir/$ARCHIVE" "$URL"
-printf '%s  %s\n' "$SOURCE_SHA256" "$workdir/$ARCHIVE" | sha256sum --check --status || {
-  echo 'ERROR: Source archive SHA-256 mismatch.' >&2
+  --output "$workdir/$RPM_FILE" "$URL"
+printf '%s  %s\n' "$RPM_SHA256" "$workdir/$RPM_FILE" | sha256sum --check --status || {
+  echo 'ERROR: RPM SHA-256 mismatch.' >&2
   exit 1
 }
 
-# Install missing build tools only; keep existing image packages untouched.
-build_deps=(gcc-c++ make libpcap-devel)
-added_deps=()
-for pkg in "${build_deps[@]}"; do
-  if ! rpm --quiet -q "$pkg"; then
-    added_deps+=("$pkg")
-  fi
-done
-if (( ${#added_deps[@]} )); then
-  "$DNF" -y install "${added_deps[@]}"
+# Check the RPM header and its payload before running any package scripts.
+metadata="$(rpm -qp --qf '%{NAME}|%{VERSION}|%{ARCH}' "$workdir/$RPM_FILE")"
+IFS='|' read -r rpm_name rpm_version rpm_arch <<< "$metadata"
+if [[ "$rpm_name" != 'whatpulse-pcap-service' || "$rpm_version" != "$VERSION" || "$rpm_arch" != x86_64 ]]; then
+  echo "ERROR: Unexpected RPM package metadata: $metadata" >&2
+  exit 1
+fi
+if ! rpm -qpl "$workdir/$RPM_FILE" | grep -Fx '/usr/bin/whatpulse-pcap-service' >/dev/null; then
+  echo 'ERROR: RPM does not contain the expected /usr/bin/whatpulse-pcap-service.' >&2
+  exit 1
 fi
 
-mkdir -p "$workdir/src"
-tar -xzf "$workdir/$ARCHIVE" -C "$workdir/src"
-source_dir="$workdir/src"
-if [[ ! -f "$source_dir/Makefile" ]]; then
-  # Some upstream source archives contain a single top-level directory.
-  shopt -s nullglob
-  entries=("$source_dir"/*)
-  shopt -u nullglob
-  if (( ${#entries[@]} != 1 )) || [[ ! -f "${entries[0]}/Makefile" ]]; then
-    echo 'ERROR: Unexpected source archive layout.' >&2
+# DNF resolves runtime dependencies (including libpcap) without a C++ toolchain.
+"$DNF" -y install "$workdir/$RPM_FILE"
+
+# Upstream's RPM may not ship its license text; retain the original Agate copy.
+if [[ ! -f /usr/share/licenses/whatpulse-pcap-service/LICENSE ]]; then
+  curl --fail --location --silent --show-error \
+    --retry 3 --connect-timeout 15 --max-time 60 \
+    --output "$workdir/LICENSE" \
+    "https://raw.githubusercontent.com/whatpulse/linux-external-pcap-service/${TAG}/LICENSE"
+  if [[ ! -s "$workdir/LICENSE" ]]; then
+    echo 'ERROR: Upstream LICENSE file is empty.' >&2
     exit 1
   fi
-  source_dir="${entries[0]}"
+  install -D -o root -g root -m 0644 \
+    "$workdir/LICENSE" \
+    /usr/share/licenses/whatpulse-pcap-service/LICENSE
 fi
-(
-  cd "$source_dir"
-  make -j"$(nproc)"
-  ./whatpulse-pcap-service --version
-)
-
-install -D -o root -g root -m 0755 \
-  "$source_dir/whatpulse-pcap-service" \
-  /usr/bin/whatpulse-pcap-service
-install -D -o root -g root -m 0644 \
-  "$source_dir/LICENSE" \
-  /usr/share/licenses/whatpulse-pcap-service/LICENSE
 
 # Ship an opt-in udev rule template in /usr. It is intentionally not active
 # by default, because any process owned by the active seat user could read
@@ -180,23 +176,18 @@ else
   echo 'WhatPulse input monitoring: udev rule available, opt-in required.'
 fi
 
-# The upstream application checks geteuid() == 0, so a non-root systemd
-# User= is not supported without patching the C++ source. Drop almost all
-# privileges and allow only the two network capabilities used upstream.
-install -d -o root -g root -m 0755 /usr/lib/systemd/system
-cat > /usr/lib/systemd/system/whatpulse-pcap-service.service <<'UNIT'
+# Keep the RPM-owned unit intact. Override its settings from /usr so that
+# Agate retains its stricter sandboxing without modifying an RPM-owned file.
+# Upstream requires EUID 0; bounding capabilities still reduces privileges.
+install -d -o root -g root -m 0755 \
+  /usr/lib/systemd/system/whatpulse-pcap-service.service.d
+cat > /usr/lib/systemd/system/whatpulse-pcap-service.service.d/90-agate-hardening.conf <<'UNIT'
 [Unit]
-Description=WhatPulse External PCap Service by WhatPulse
-Documentation=https://github.com/whatpulse/linux-external-pcap-service
-After=network.target
-Wants=network.target
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
 [Service]
-Type=simple
-User=root
-Group=root
+ExecStart=
 ExecStart=/usr/bin/whatpulse-pcap-service --host 127.0.0.1 --log-file ""
 Restart=on-failure
 RestartSec=5s
@@ -227,24 +218,16 @@ UMask=0077
 # The service only connects to the local WhatPulse client on TCP/3499.
 IPAddressDeny=any
 IPAddressAllow=localhost
-
-[Install]
-WantedBy=multi-user.target
 UNIT
+chmod 0644 /usr/lib/systemd/system/whatpulse-pcap-service.service.d/90-agate-hardening.conf
 
-# Remove only toolchain packages that this script installed. This runs only
-# during image creation, never on a booted Agate system.
-if (( ${#added_deps[@]} )); then
-  "$DNF" -y remove "${added_deps[@]}"
-fi
-
-# Check the final binary AFTER removal of build-only dependencies.
-if ldd /usr/bin/whatpulse-pcap-service | grep -q 'not found'; then
+# Verify all required shared libraries are available in the final image.
+if ldd /usr/bin/whatpulse-pcap-service | grep -F 'not found' >/dev/null; then
   echo 'ERROR: The installed binary has missing runtime libraries.' >&2
   exit 1
 fi
 /usr/bin/whatpulse-pcap-service --version
-printf '%s\n' 'WhatPulse PCap Service installed in /usr. Enable it with the BlueBuild systemd module.'
+printf '%s\n' 'WhatPulse PCap Service RPM installed; Agate hardening drop-in is present. Manage enablement with the BlueBuild systemd module.'
 if [[ "$WHATPULSE_ENABLE_INPUT_UACCESS" == 0 ]]; then
   printf '%s\n' 'To enable input access on a booted machine: sudo install -Dm644 /usr/share/whatpulse-pcap-service/70-whatpulse-input.rules /etc/udev/rules.d/70-whatpulse-input.rules'
 fi
