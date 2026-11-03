@@ -22,14 +22,12 @@ modules:
         - docker-compose-plugin # Docker Compose plugin for container orchestration
         - flatpak-builder # Flatpak application builder
         - git-subtree # Git subtree merge tool
-        - guestfs-tools # Tools for working with virtual machine disk images
-        - libvirt # Virtualization API and tools
+        - libvirt-daemon-kvm # KVM support for libvirt
+        - libvirt-daemon-config-network # Network configuration for libvirt daemon
         - nicstat # Network interface statistics tool
         - numactl # NUMA control tool
-        - podman-machine # Podman machine management tool
         - podman-tui # Podman terminal user interface
         - python3-ramalama # Python 3 bindings for Ramalama
-        - qemu # QEMU emulator, for running virtual machines
         - qemu-kvm # QEMU KVM accelerator
         - restic # Backup tool
         - rclone # Remote file storage synchronization tool
