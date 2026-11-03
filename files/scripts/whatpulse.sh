@@ -14,7 +14,8 @@ WHATPULSE_ENABLE_INPUT_UACCESS="${WHATPULSE_ENABLE_INPUT_UACCESS:-1}"
 tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT
 
-# GitHub's latest endpoint skips prereleases. Require one RPM and its digest.
+# GitHub's latest endpoint skips prereleases. Match the RPM by package/arch,
+# not by version: release tags and uploaded filenames can disagree.
 curl -fsSL --retry 3 \
   https://api.github.com/repos/whatpulse/linux-external-pcap-service/releases/latest \
   -o "$tmp/release.json"
@@ -23,7 +24,7 @@ fields="$(jq -er '
   .tag_name as $tag
   | [.assets[] | select(
       .state == "uploaded"
-      and (.name | startswith("whatpulse-pcap-service-" + ($tag | ltrimstr("v")) + "-") and endswith(".x86_64.rpm"))
+      and (.name | test("^whatpulse-pcap-service-.+\\.x86_64\\.rpm$"))
       and (.browser_download_url == ("https://github.com/whatpulse/linux-external-pcap-service/releases/download/" + $tag + "/" + .name))
     )]
   | if length == 1 then .[0] else error("Expected exactly one x86_64 RPM") end
