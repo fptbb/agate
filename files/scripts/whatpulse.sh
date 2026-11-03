@@ -60,20 +60,39 @@ if not isinstance(tag, str) or not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag)
     sys.exit("ERROR: Latest release has an unexpected version tag")
 
 version = tag[1:]
-filename = f"whatpulse-pcap-service-{version}-source.tar.gz"
-assets = [asset for asset in release.get("assets", [])
-          if asset.get("name") == filename and asset.get("state") == "uploaded"]
+# The filename's version can lag behind the release tag (e.g. v1.5.2
+# published with whatpulse-pcap-service-1.5.1-source.tar.gz).
+source_pattern = re.compile(
+    r"whatpulse-pcap-service-([0-9]+\.[0-9]+\.[0-9]+)-source\.tar\.gz"
+)
+assets = [
+    asset for asset in release.get("assets", [])
+    if isinstance(asset.get("name"), str)
+    and source_pattern.fullmatch(asset["name"])
+    and asset.get("state") == "uploaded"
+]
 if len(assets) != 1:
-    sys.exit(f"ERROR: Expected one source asset named {filename}")
+    sys.exit(f"ERROR: Expected exactly one source archive; found {len(assets)}")
 
 asset = assets[0]
+filename = asset["name"]
+archive_version = source_pattern.fullmatch(filename).group(1)
+if archive_version != version:
+    print(
+        f"WARNING: Release {tag} contains source archive labeled "
+        f"{archive_version}; using the published asset.",
+        file=sys.stderr,
+    )
+
 digest = asset.get("digest", "")
 if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest):
     sys.exit("ERROR: The source asset is missing its GitHub SHA-256 digest")
 
 url = asset.get("browser_download_url", "")
-expected = ("https://github.com/whatpulse/linux-external-pcap-service/"
-            f"releases/download/{tag}/{filename}")
+expected = (
+    "https://github.com/whatpulse/linux-external-pcap-service/"
+    f"releases/download/{tag}/{filename}"
+)
 if url != expected:
     sys.exit("ERROR: Unexpected source asset download URL")
 
@@ -89,7 +108,7 @@ ARCHIVE="${release_fields[1]}"
 SOURCE_SHA256="${release_fields[2]}"
 URL="${release_fields[3]}"
 
-printf 'Downloading WhatPulse PCap Service %s...\n' "$VERSION"
+printf 'Downloading WhatPulse PCap Service %s (asset: %s)...\n' "$VERSION" "$ARCHIVE"
 curl --fail --location --silent --show-error \
   --retry 3 --connect-timeout 15 --max-time 180 \
   --output "$workdir/$ARCHIVE" "$URL"
