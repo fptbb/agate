@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "lucas@fptbb.com",
+                "Name": "Gary Bendig"
+            }
+        ],
+        "Id": "Next",
+        "License": "Unsplash",
+        "Name": "Fox2"
+    }
+}

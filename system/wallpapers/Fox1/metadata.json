@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "lucas@fptbb.com",
+                "Name": "Lucas Oliveira"
+            }
+        ],
+        "Id": "Next",
+        "License": "CC-BY-SA-4.0",
+        "Name": "Fox1"
+    }
+}
