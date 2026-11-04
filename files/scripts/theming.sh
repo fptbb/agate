@@ -157,7 +157,7 @@ ln -sfn /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl \
     /usr/share/backgrounds/default.jxl
 ln -sfn /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl \
     /usr/share/backgrounds/default-dark.jxl
-rm -f  -- /usr/share/wallpapers/convergence.jxl
+rm -f -- /usr/share/wallpapers/convergence.jxl
 rm -f -- /usr/share/wallpapers/convergence.png
 
 # Update every *installed* Global Theme, including the just-installed Catppuccin
@@ -178,4 +178,37 @@ kwriteconfig6 --file /etc/xdg/kdeglobals \
 kwriteconfig6 --file /etc/xdg/kcminputrc \
     --group Mouse --key cursorTheme catppuccin-mocha-sapphire-cursors
 
-log 'Agate theming complete: Mocha Sapphire + Kora + Fox1; Frappe/Latte available, PlasMusic installed'
+# -------------------------
+# Agate custom cursor themes
+# -------------------------
+
+log 'Installing custom cursor themes from Agate assets'
+
+# Reuse the existing build temporary directory and EXIT trap.
+# This tracks the moving assets branch, without pinning a commit.
+assets_checkout="$work/agate-assets"
+git clone --quiet \
+    --depth 1 \
+    --single-branch \
+    --branch assets \
+    --sparse \
+    https://gitlab.com/fpsys/agate.git \
+    "$assets_checkout"
+git -C "$assets_checkout" sparse-checkout set system/pointers
+log "Fetched Agate assets at $(git -C "$assets_checkout" rev-parse --short=12 HEAD)"
+
+cursors_source="$assets_checkout/system/pointers"
+cursors_dest='/usr/share/icons'
+[[ -d "$cursors_source" ]] || die "Cursor themes directory not found: $cursors_source"
+
+for theme in "$cursors_source"/*/; do
+    [[ -d "$theme/cursors" ]] || continue
+    name="$(basename "$theme")"
+    destination="$cursors_dest/$name"
+    rm -rf -- "$destination"
+    install -d "$destination"
+    cp -a "$theme/." "$destination/"
+    log "Installed cursor theme: $name"
+done
+
+log 'Agate theming complete: Mocha Sapphire + Kora + Fox1; Frappe/Latte available, PlasMusic and custom cursors installed'
