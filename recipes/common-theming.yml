@@ -13,5 +13,6 @@ modules:
     include:
       - themes.just
   - type: script
+    no-cache: true
     scripts:
       - theming.sh
