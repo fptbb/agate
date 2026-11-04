@@ -148,7 +148,7 @@ for wallpaper in \
     'Steam Deck Logo 10.jpg' 'Steam Deck Logo 11.jpg' 'Steam Deck Logo 12.jpg' \
     'Steam Deck Logo 13.jpg' 'Steam Deck Logo Default.jpg' \
     'Troll.jpg' 'ublue.png' 'VGUI2.jpg' 'bazzite-blue.png' 'bazzite-glass.png' \
-    ''; do
+    'penguins.jxl'; do
     rm -f -- "/usr/share/wallpapers/$wallpaper"
 done
 
