@@ -147,7 +147,8 @@ for wallpaper in \
     'Steam Deck Logo 7.jpg' 'Steam Deck Logo 8.jpg' 'Steam Deck Logo 9.jpg' \
     'Steam Deck Logo 10.jpg' 'Steam Deck Logo 11.jpg' 'Steam Deck Logo 12.jpg' \
     'Steam Deck Logo 13.jpg' 'Steam Deck Logo Default.jpg' \
-    'Troll.jpg' 'ublue.png' 'VGUI2.jpg'; do
+    'Troll.jpg' 'ublue.png' 'VGUI2.jpg' 'bazzite-blue.png' 'bazzite-glass.png' \
+    ''; do
     rm -f -- "/usr/share/wallpapers/$wallpaper"
 done
 
@@ -156,10 +157,6 @@ ln -sfn /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl \
     /usr/share/backgrounds/default.jxl
 ln -sfn /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl \
     /usr/share/backgrounds/default-dark.jxl
-ln -sfn /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl \
-    /usr/share/wallpapers/convergence.jxl
-ln -sfn /usr/share/wallpapers/fox.png \
-    /usr/share/wallpapers/convergence.png
 
 # Update every *installed* Global Theme, including the just-installed Catppuccin
 # packages. This ensures Fox1 stays the default when switching Global Themes.
