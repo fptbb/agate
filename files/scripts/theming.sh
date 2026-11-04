@@ -48,7 +48,7 @@ git clone --quiet \
     https://gitlab.com/fpsys/agate.git \
     "$assets_checkout"
 git -C "$assets_checkout" sparse-checkout set \
-    system/pointers system/wallpapers system/pixmaps
+    system/pointers system/wallpapers system/pixmaps system/anaconda
 log "Fetched Agate assets at $(git -C "$assets_checkout" rev-parse HEAD)"
 
 assets_dir="$assets_checkout/system"
@@ -67,6 +67,16 @@ for folder in wallpapers pixmaps; do
     cp -a "$assets_dir/$folder/." "/usr/share/$folder/"
     log "Installed Agate assets: $folder"
 done
+
+log 'Installing Agate Anaconda artwork'
+anaconda_source="$assets_checkout/system/anaconda"
+anaconda_dest="/usr/share/anaconda/pixmaps"
+
+[[ -d "$anaconda_source" ]] || die "Missing Anaconda assets: $anaconda_source"
+
+install -d "$anaconda_dest"
+cp -a "$anaconda_source/." "$anaconda_dest/"
+log 'Agate Anaconda artwork installed'
 
 # Install all custom cursor packages, including names containing spaces.
 # Replace existing copies rather than layering stale files over old themes.
