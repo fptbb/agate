@@ -157,6 +157,8 @@ ln -sfn /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl \
     /usr/share/backgrounds/default.jxl
 ln -sfn /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl \
     /usr/share/backgrounds/default-dark.jxl
+rm -f  -- /usr/share/wallpapers/convergence.jxl
+rm -f -- /usr/share/wallpapers/convergence.png
 
 # Update every *installed* Global Theme, including the just-installed Catppuccin
 # packages. This ensures Fox1 stays the default when switching Global Themes.
