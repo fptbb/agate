@@ -87,11 +87,6 @@ if ! grep -q 'title: "Agate Utilities"' "$YAFTI_CONFIG"; then
   - title: "Agate Utilities"\
     description: "Agate-specific installers and maintenance tools"\
     actions:\
-      - id: "agate-themes"\
-        title: "Agate Themes"\
-        description: "Installs Catppuccin, Kora, and PlasMusic."\
-        default: false\
-        script: "ujust agate-manage-themes"\
       - id: "agate-devbox"\
         title: "Install DevBox"\
         description: "Installs DevBox for disposable development environments."\
@@ -140,30 +135,12 @@ ICONS="/usr/share/icons/hicolor"
 APPS="${ICONS}/scalable/apps"
 PLACES="${ICONS}/scalable/places"
 
-# Restore branding assets from BlueBuild's mounted build files.
-# This also prevents stale or missing files from affecting either channel.
-ARTWORK_SOURCE="/tmp/files/system/usr/share/pixmaps"
-
-for name in agate-logo.svg agate-logo-le.svg agate-logo-white.svg; do
-    source="${ARTWORK_SOURCE}/${name}"
-    target="${PIXMAPS}/${name}"
-
-    if [[ -s "$source" ]]; then
-        install -Dm644 "$source" "$target"
-        log "Installed artwork: $name"
-    elif [[ -s "$target" ]]; then
-        log "Using existing artwork: $name"
-    else
-        log "Required Agate artwork missing: $name"
-        log "Checked: $source and $target"
-        exit 1
-    fi
-done
-
-if ! command -v rsvg-convert >/dev/null 2>&1; then
-    log "rsvg-convert is missing; install librsvg2-tools before branding.sh"
+# theming.sh installs all pixmaps from assets; branding only needs the
+# Agate SVG variants. Original Fedora assets remain untouched.
+command -v rsvg-convert >/dev/null 2>&1 || {
+    log 'Missing librsvg2-tools (rsvg-convert)'
     exit 1
-fi
+}
 
 link_to() {
     local source="$1" destination="$2"
@@ -171,9 +148,12 @@ link_to() {
     ln -sfnT "$source" "$destination"
 }
 
-# Keep the three Agate SVGs as source artwork. Redirect only fp-logo aliases.
-# Fedora's dedicated GDM, sprite and medium-logo assets are intentionally preserved.
 for variant in '' '-le' '-white'; do
+    source="${PIXMAPS}/agate-logo${variant}.svg"
+    [[ -s "$source" ]] || {
+        log "Missing required artwork: $source (check theming.sh assets)"
+        exit 1
+    }
     link_to "agate-logo${variant}.svg" "${PIXMAPS}/fp-logo${variant}.svg"
 done
 
@@ -214,21 +194,16 @@ rsvg-convert \
     --output "${ICONS}/256x256/apps/agate-logo-white.png" \
     "${PIXMAPS}/agate-logo-white.svg"
 
-# Old pixmap filenames used by applications. Point to real PNGs of
-# suitable sizes, avoiding multiple copies of the same raster artwork.
+# Generate ONLY these three PNG aliases. fedora-logo.png and the other
+# Fedora/bootloader originals are installed verbatim from the assets branch.
 normal_256="${ICONS}/256x256/apps/agate-logo-icon.png"
 white_256="${ICONS}/256x256/apps/agate-logo-white.png"
 
 link_to "$normal_256" "${PIXMAPS}/fp-logo.png"
 link_to "$normal_256" "${PIXMAPS}/faces/fp-logo.png"
-link_to "$normal_256" "${PIXMAPS}/fedora-logo.png"
 link_to "$white_256"  "${PIXMAPS}/system-logo-white.png"
 
-# DO NOT modify these Fedora assets; they have independent system replacements:
-#   fedora_logo_med.png, fedora_whitelogo_med.png, fedora_whitelogo.svg
-#   fedora-gdm-logo.png, fedora-logo-small.png
-#   fedora-logo-sprite.png, fedora-logo-sprite.svg
-# The ICO and bootloader ICNS resources also remain unchanged.
+# Preserve all other pixmaps exactly as supplied by the Agate assets branch.
 
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f "$ICONS"

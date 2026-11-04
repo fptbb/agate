@@ -8,7 +8,7 @@ log() { printf '=== %s ===\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 [[ "$(id -u)" -eq 0 ]] || die 'Run as root (BlueBuild script module).'
-for cmd in git curl tar kwriteconfig6 kpackagetool6 python3; do
+for cmd in git curl find kwriteconfig6 kpackagetool6 python3; do
     command -v "$cmd" >/dev/null 2>&1 || die "Missing required build command: $cmd"
 done
 
@@ -29,6 +29,62 @@ clone() {
     git clone --quiet --depth=1 --single-branch --branch "$ref" "$url" "$destination"
     log "Fetched $(basename "$destination") at $(git -C "$destination" rev-parse --short=12 HEAD)"
 }
+
+# -------------------------
+# Agate assets (moving branch, single sparse checkout)
+# -------------------------
+
+# Wallpapers and pixmaps are installed before wallpaper configuration below;
+# branding.sh runs later in the recipe and consumes the installed pixmaps.
+# Do not pin the assets branch. Record the actual commit in the CI output.
+AGATE_ASSETS_REF="${AGATE_ASSETS_REF:-assets}"
+assets_checkout="$work/agate-assets"
+log "Fetching Agate assets branch: $AGATE_ASSETS_REF"
+git clone --quiet \
+    --depth 1 \
+    --single-branch \
+    --branch "$AGATE_ASSETS_REF" \
+    --sparse \
+    https://gitlab.com/fpsys/agate.git \
+    "$assets_checkout"
+git -C "$assets_checkout" sparse-checkout set \
+    system/pointers system/wallpapers system/pixmaps
+log "Fetched Agate assets at $(git -C "$assets_checkout" rev-parse HEAD)"
+
+assets_dir="$assets_checkout/system"
+for folder in pointers wallpapers pixmaps; do
+    [[ -d "$assets_dir/$folder" ]] || die "Missing Agate assets directory: $folder"
+done
+
+# Drop inherited top-level wallpaper images and links, while keeping any
+# wallpaper packages (subdirectories) provided by the base image.
+# Copy our wallpapers AFTER cleanup so every filename in assets is preserved.
+install -d /usr/share/wallpapers /usr/share/pixmaps /usr/share/icons
+find /usr/share/wallpapers -mindepth 1 -maxdepth 1 \
+    \( -type f -o -type l \) -delete
+
+for folder in wallpapers pixmaps; do
+    cp -a "$assets_dir/$folder/." "/usr/share/$folder/"
+    log "Installed Agate assets: $folder"
+done
+
+# Install all custom cursor packages, including names containing spaces.
+# Replace existing copies rather than layering stale files over old themes.
+cursors_source="$assets_dir/pointers"
+[[ -d "$cursors_source" ]] || die "Cursor themes directory not found: $cursors_source"
+shopt -s nullglob
+cursor_themes=("$cursors_source"/*/)
+shopt -u nullglob
+(( ${#cursor_themes[@]} > 0 )) || die "No cursor themes found in $cursors_source"
+for theme in "${cursor_themes[@]}"; do
+    [[ -d "$theme/cursors" ]] || die "Invalid cursor package (no cursors/): $theme"
+    name="$(basename "$theme")"
+    dest="/usr/share/icons/$name"
+    rm -rf -- "$dest"
+    install -d "$dest"
+    cp -a "$theme/." "$dest/"
+    log "Installed cursor theme: $name"
+done
 
 # Run upstream Catppuccin's *build-only* modes in isolated XDG paths.
 # Do not run 'auto': that mode applies the theme to the current user/session.
@@ -123,12 +179,12 @@ install -d /usr/share/plasma/plasmoids
 rm -rf -- "/usr/share/plasma/plasmoids/$plugin_id"
 cp -a "$plasmusic_src" "/usr/share/plasma/plasmoids/$plugin_id"
 
-log 'Configuring Fox1 wallpaper metadata and desktop defaults'
-for wallpaper in Fox1 Fox2; do
-    metadata="/usr/share/wallpapers/$wallpaper/metadata.json"
-    [[ -f "$metadata" ]] || die "Missing wallpaper package: $metadata"
-    # Existing Agate metadata inherited KPlugin.Id=Next from the KDE sample.
-    python3 - "$metadata" "$wallpaper" <<'PY'
+log 'Configuring Agate wallpaper packages and desktop defaults'
+# Fix metadata only for wallpapers supplied by Agate, not base-image packages.
+for package in "$assets_dir/wallpapers"/*/; do
+    [[ -f "$package/metadata.json" ]] || continue
+    name="$(basename "$package")"
+    python3 - "/usr/share/wallpapers/$name/metadata.json" "$name" <<'PYMETA'
 import json, pathlib, sys
 path = pathlib.Path(sys.argv[1])
 name = sys.argv[2]
@@ -136,20 +192,13 @@ data = json.loads(path.read_text(encoding='utf-8'))
 if data['KPlugin'].get('Id') != name:
     data['KPlugin']['Id'] = name
     path.write_text(json.dumps(data, ensure_ascii=False, indent=4) + '\n', encoding='utf-8')
-PY
+PYMETA
 done
 
-# Preserve Agate's pre-existing Bazzite wallpaper cleanup.
-for wallpaper in \
-    'giants.jxl' \
-    'Steam Deck Logo 1.jpg' 'Steam Deck Logo 2.jpg' 'Steam Deck Logo 3.jpg' \
-    'Steam Deck Logo 4.jpg' 'Steam Deck Logo 5.jpg' 'Steam Deck Logo 6.jpg' \
-    'Steam Deck Logo 7.jpg' 'Steam Deck Logo 8.jpg' 'Steam Deck Logo 9.jpg' \
-    'Steam Deck Logo 10.jpg' 'Steam Deck Logo 11.jpg' 'Steam Deck Logo 12.jpg' \
-    'Steam Deck Logo 13.jpg' 'Steam Deck Logo Default.jpg' \
-    'Troll.jpg' 'ublue.png' 'VGUI2.jpg' 'bazzite-blue.png' 'bazzite-glass.png' \
-    'penguins.jxl'; do
-    rm -f -- "/usr/share/wallpapers/$wallpaper"
+# Fox1 is the explicit default; verify its light and dark assets exist.
+for mode in images images_dark; do
+    [[ -s "/usr/share/wallpapers/Fox1/contents/$mode/2560x1080.jxl" ]] || \
+        die "Missing Fox1 wallpaper variant: $mode"
 done
 
 install -d /usr/share/backgrounds
@@ -157,8 +206,6 @@ ln -sfn /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl \
     /usr/share/backgrounds/default.jxl
 ln -sfn /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl \
     /usr/share/backgrounds/default-dark.jxl
-rm -f -- /usr/share/wallpapers/convergence.jxl
-rm -f -- /usr/share/wallpapers/convergence.png
 
 # Update every *installed* Global Theme, including the just-installed Catppuccin
 # packages. This ensures Fox1 stays the default when switching Global Themes.
@@ -178,37 +225,4 @@ kwriteconfig6 --file /etc/xdg/kdeglobals \
 kwriteconfig6 --file /etc/xdg/kcminputrc \
     --group Mouse --key cursorTheme catppuccin-mocha-sapphire-cursors
 
-# -------------------------
-# Agate custom cursor themes
-# -------------------------
-
-log 'Installing custom cursor themes from Agate assets'
-
-# Reuse the existing build temporary directory and EXIT trap.
-# This tracks the moving assets branch, without pinning a commit.
-assets_checkout="$work/agate-assets"
-git clone --quiet \
-    --depth 1 \
-    --single-branch \
-    --branch assets \
-    --sparse \
-    https://gitlab.com/fpsys/agate.git \
-    "$assets_checkout"
-git -C "$assets_checkout" sparse-checkout set system/pointers
-log "Fetched Agate assets at $(git -C "$assets_checkout" rev-parse --short=12 HEAD)"
-
-cursors_source="$assets_checkout/system/pointers"
-cursors_dest='/usr/share/icons'
-[[ -d "$cursors_source" ]] || die "Cursor themes directory not found: $cursors_source"
-
-for theme in "$cursors_source"/*/; do
-    [[ -d "$theme/cursors" ]] || continue
-    name="$(basename "$theme")"
-    destination="$cursors_dest/$name"
-    rm -rf -- "$destination"
-    install -d "$destination"
-    cp -a "$theme/." "$destination/"
-    log "Installed cursor theme: $name"
-done
-
-log 'Agate theming complete: Mocha Sapphire + Kora + Fox1; Frappe/Latte available, PlasMusic and custom cursors installed'
+log 'Agate theming complete: Mocha Sapphire + Kora + Fox1; Frappe/Latte, PlasMusic and assets installed'
