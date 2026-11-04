@@ -61,7 +61,7 @@ modules:
         # - vscode.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
-        - https://packages.microsoft.com/keys/microsoft.asc
+        # - https://packages.microsoft.com/keys/microsoft.asc
     install:
       skip-unavailable: true
       skip-broken: true
