@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+
+modules:
+  - type: dnf
+    remove:
+      auto-remove: false
+      packages:
+        # Remove packages that are not needed
+        - plasma-workspace-wallpapers
+        - plasma-oxygen
+        - plasma-oxygen-qt6
+        - oxygen-cursor-themes
+        - oxygen-icon-theme
+        - oxygen-sounds
+        - steamdeck-kde-presets-desktop

@@ -38,3 +38,30 @@ ln -sf /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl /usr/share/backg
 ln -sf /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl /usr/share/backgrounds/default-dark.jxl
 ln -sf /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl /usr/share/wallpapers/convergence.jxl
 ln -sf /usr/share/wallpapers/fox.png /usr/share/wallpapers/convergence.png
+
+
+# -------------------------
+# Default Plasma wallpaper
+# -------------------------
+
+log "Configuring Fox1 as the default Plasma wallpaper"
+
+WALLPAPER="/usr/share/wallpapers/Fox1"
+LOOK_AND_FEEL="/usr/share/plasma/look-and-feel"
+
+if [[ ! -f "${WALLPAPER}/metadata.json" ]]; then
+    log "Fox1 wallpaper package not found"
+    exit 1
+fi
+
+for defaults in "${LOOK_AND_FEEL}"/*/contents/defaults; do
+    [[ -f "$defaults" ]] || continue
+
+    kwriteconfig6 \
+        --file "$defaults" \
+        --group Wallpaper \
+        --key Image \
+        Fox1
+
+    log "Configured: $(basename "$(dirname "$(dirname "$(dirname "$defaults")")")")"
+done

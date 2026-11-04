@@ -58,7 +58,7 @@ modules:
       files:
         - nordvpn.repo
         - tailscale.repo
-        - vscode.repo
+        # - vscode.repo
       keys:
         - https://repo.nordvpn.com/gpg/nordvpn_public.asc
         - https://packages.microsoft.com/keys/microsoft.asc
@@ -76,7 +76,7 @@ modules:
         - tailscale # a zero-config vpn and private network tool
 
         # Development & Programming
-        - code # Visual Studio Code, from the Microsoft repo added above
+        # - code # Visual Studio Code, from the Microsoft repo added above
 
         # Security & Authentication
         - veracrypt # disk encryption software based on truecrypt
