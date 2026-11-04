@@ -1,67 +1,182 @@
 #!/usr/bin/env bash
-set ${SET_X:+-x} -eou pipefail
-trap '[[ $BASH_COMMAND != echo* ]] && [[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
-log() {
-    echo "=== $* ==="
+# System-wide KDE theming for Agate's BlueBuild image.
+# Installs Catppuccin Frappe/Latte/Mocha Sapphire, Kora and PlasMusic.
+# Defaults: Catppuccin Mocha Sapphire + Kora + Fox1 wallpaper.
+set -Eeuo pipefail
+
+log() { printf '=== %s ===\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+[[ "$(id -u)" -eq 0 ]] || die 'Run as root (BlueBuild script module).'
+for cmd in git curl tar kwriteconfig6 kpackagetool6 python3; do
+    command -v "$cmd" >/dev/null 2>&1 || die "Missing required build command: $cmd"
+done
+
+# Optional fixed refs make CI builds reproducible. Defaults track upstream.
+CATPPUCCIN_REF="${CATPPUCCIN_REF:-main}"
+KORA_REF="${KORA_REF:-master}"
+PLASMUSIC_REF="${PLASMUSIC_REF:-main}"
+CATPPUCCIN_CURSORS_VERSION="${CATPPUCCIN_CURSORS_VERSION:-v2.0.0}"
+
+work="$(mktemp -d /tmp/agate-themes.XXXXXXXX)"
+trap 'rm -rf -- "$work"' EXIT
+stage="$work/stage"
+mkdir -p "$stage" "$work/home" "$work/config" "$work/cache" "$work/runtime"
+chmod 700 "$work/runtime"
+
+clone() {
+    local url="$1" ref="$2" destination="$3"
+    git clone --quiet --depth=1 --single-branch --branch "$ref" "$url" "$destination"
+    log "Fetched $(basename "$destination") at $(git -C "$destination" rev-parse --short=12 HEAD)"
 }
 
-#!/usr/bin/env bash
+# Run upstream Catppuccin's *build-only* modes in isolated XDG paths.
+# Do not run 'auto': that mode applies the theme to the current user/session.
+catppuccin_build() {
+    (
+        cd "$work/catppuccin-kde"
+        HOME="$work/home" \
+        XDG_DATA_HOME="$stage" \
+        XDG_CONFIG_HOME="$work/config" \
+        XDG_CACHE_HOME="$work/cache" \
+        XDG_RUNTIME_DIR="$work/runtime" \
+        QT_QPA_PLATFORM=offscreen \
+        ./install.sh -q --local-cursor "$3" "$1" 12 2 "$2"
+    )
+}
 
-log "Removing default wallpapers and setting up symlinks for default wallpapers."
+log 'Cloning Catppuccin KDE'
+clone https://github.com/catppuccin/kde.git "$CATPPUCCIN_REF" "$work/catppuccin-kde"
 
-base_dir="/usr/share/wallpapers/"
+# Same choices as the old ujust command: Frappe (3), Latte (4), Mocha (1),
+# Sapphire (12), Classic window decorations (2).
+for item in '3:Frappe:frappe' '4:Latte:latte' '1:Mocha:mocha'; do
+    IFS=: read -r choice name lowercase <<< "$item"
+    theme="Catppuccin-${name}-Sapphire"
+    accent_cursor="catppuccin-${lowercase}-sapphire-cursors"
+    dark_cursor="catppuccin-${lowercase}-dark-cursors"
+    log "Building $theme"
 
-wallpapers=(
-    "giants.jxl"
-    "Steam Deck Logo 1.jpg"
-    "Steam Deck Logo 2.jpg"
-    "Steam Deck Logo 3.jpg"
-    "Steam Deck Logo 4.jpg"
-    "Steam Deck Logo 5.jpg"
-    "Steam Deck Logo 6.jpg"
-    "Steam Deck Logo 7.jpg"
-    "Steam Deck Logo 8.jpg"
-    "Steam Deck Logo 9.jpg"
-    "Steam Deck Logo 10.jpg"
-    "Steam Deck Logo 11.jpg"
-    "Steam Deck Logo 12.jpg"
-    "Steam Deck Logo 13.jpg"
-    "Steam Deck Logo Default.jpg"
-    "Troll.jpg"
-    "ublue.png"
-    "VGUI2.jpg"
-)
+    # The generated Global Theme references a cursor ID. Download both cursor
+    # variants explicitly with curl, avoiding a permanent wget dependency.
+    mkdir -p "$stage/icons"
+    for cursor in "$accent_cursor" "$dark_cursor"; do
+        zipfile="$work/${cursor}.zip"
+        curl --fail --location --silent --show-error --retry 3 \
+            --output "$zipfile" \
+            "https://github.com/catppuccin/cursors/releases/download/${CATPPUCCIN_CURSORS_VERSION}/${cursor}.zip"
+        python3 -m zipfile -e "$zipfile" "$stage/icons"
+        [[ -f "$stage/icons/$cursor/index.theme" || -f "$stage/icons/$cursor/cursor.theme" ]] \
+            || die "Cursor archive lacks theme metadata: $cursor"
+    done
 
-rm -f "${wallpapers[@]/#/$base_dir}"
+    # These modes do not apply a running user theme. Global mode uses
+    # kpackagetool6 to install *inside the temporary XDG_DATA_HOME*.
+    catppuccin_build "$choice" global "$stage/icons/$accent_cursor"
+    catppuccin_build "$choice" aurorae "$stage/icons/$accent_cursor"
+    catppuccin_build "$choice" color "$stage/icons/$accent_cursor"
 
-ln -sf /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl /usr/share/backgrounds/default.jxl
-ln -sf /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl /usr/share/backgrounds/default-dark.jxl
-ln -sf /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl /usr/share/wallpapers/convergence.jxl
-ln -sf /usr/share/wallpapers/fox.png /usr/share/wallpapers/convergence.png
+    # 'color' is generation-only: copy the generated .colors into stage.
+    install -Dm644 \
+        "$work/catppuccin-kde/dist/Catppuccin${name}Sapphire.colors" \
+        "$stage/color-schemes/Catppuccin${name}Sapphire.colors"
 
-
-# -------------------------
-# Default Plasma wallpaper
-# -------------------------
-
-log "Configuring Fox1 as the default Plasma wallpaper"
-
-WALLPAPER="/usr/share/wallpapers/Fox1"
-LOOK_AND_FEEL="/usr/share/plasma/look-and-feel"
-
-if [[ ! -f "${WALLPAPER}/metadata.json" ]]; then
-    log "Fox1 wallpaper package not found"
-    exit 1
-fi
-
-for defaults in "${LOOK_AND_FEEL}"/*/contents/defaults; do
-    [[ -f "$defaults" ]] || continue
-
-    kwriteconfig6 \
-        --file "$defaults" \
-        --group Wallpaper \
-        --key Image \
-        Fox1
-
-    log "Configured: $(basename "$(dirname "$(dirname "$(dirname "$defaults")")")")"
+    defaults="$stage/plasma/look-and-feel/$theme/contents/defaults"
+    [[ -f "$defaults" ]] || die "Global Theme not staged: $theme (check kpackagetool6/XDG_DATA_HOME)"
+    [[ -d "$stage/aurorae/themes/Catppuccin${name}-Classic" ]] \
+        || die "Aurorae decoration not staged: $name"
+    # The upstream theme otherwise sets its own icon theme, if present.
+    kwriteconfig6 --file "$defaults" --group kdeglobals --group Icons --key Theme kora
+    kwriteconfig6 --file "$defaults" --group Wallpaper --key Image Fox1
+    log "Staged $theme"
 done
+
+log 'Installing Catppuccin assets system-wide'
+for dir in plasma/look-and-feel aurorae/themes color-schemes icons; do
+    install -d "/usr/share/$dir"
+    cp -a "$stage/$dir/." "/usr/share/$dir/"
+done
+
+log 'Cloning and installing Kora icon themes'
+clone https://github.com/bikass/kora.git "$KORA_REF" "$work/kora"
+[[ -f "$work/kora/kora/index.theme" ]] || die 'Kora index.theme missing'
+for variant in kora kora-pgrey; do
+    if [[ -d "$work/kora/$variant" ]]; then
+        rm -rf -- "/usr/share/icons/$variant"
+        cp -a "$work/kora/$variant" "/usr/share/icons/$variant"
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache --force --quiet "/usr/share/icons/$variant" || true
+        fi
+        log "Installed icon theme: $variant"
+    fi
+done
+
+log 'Cloning and installing PlasMusic Toolbar'
+clone https://github.com/ccatterina/plasmusic-toolbar.git "$PLASMUSIC_REF" "$work/plasmusic-toolbar"
+plasmusic_src="$work/plasmusic-toolbar/src"
+[[ -f "$plasmusic_src/metadata.json" ]] || die 'PlasMusic metadata.json missing'
+plugin_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["KPlugin"]["Id"])' "$plasmusic_src/metadata.json")"
+[[ "$plugin_id" == 'plasmusic-toolbar' ]] || die "Unexpected PlasMusic plugin ID: $plugin_id"
+# A system-wide plasmoid is a KPackage directly under /usr/share/plasma/plasmoids/.
+# Copying avoids installing into the build user's home directory.
+install -d /usr/share/plasma/plasmoids
+rm -rf -- "/usr/share/plasma/plasmoids/$plugin_id"
+cp -a "$plasmusic_src" "/usr/share/plasma/plasmoids/$plugin_id"
+
+log 'Configuring Fox1 wallpaper metadata and desktop defaults'
+for wallpaper in Fox1 Fox2; do
+    metadata="/usr/share/wallpapers/$wallpaper/metadata.json"
+    [[ -f "$metadata" ]] || die "Missing wallpaper package: $metadata"
+    # Existing Agate metadata inherited KPlugin.Id=Next from the KDE sample.
+    python3 - "$metadata" "$wallpaper" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+name = sys.argv[2]
+data = json.loads(path.read_text(encoding='utf-8'))
+if data['KPlugin'].get('Id') != name:
+    data['KPlugin']['Id'] = name
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=4) + '\n', encoding='utf-8')
+PY
+done
+
+# Preserve Agate's pre-existing Bazzite wallpaper cleanup.
+for wallpaper in \
+    'giants.jxl' \
+    'Steam Deck Logo 1.jpg' 'Steam Deck Logo 2.jpg' 'Steam Deck Logo 3.jpg' \
+    'Steam Deck Logo 4.jpg' 'Steam Deck Logo 5.jpg' 'Steam Deck Logo 6.jpg' \
+    'Steam Deck Logo 7.jpg' 'Steam Deck Logo 8.jpg' 'Steam Deck Logo 9.jpg' \
+    'Steam Deck Logo 10.jpg' 'Steam Deck Logo 11.jpg' 'Steam Deck Logo 12.jpg' \
+    'Steam Deck Logo 13.jpg' 'Steam Deck Logo Default.jpg' \
+    'Troll.jpg' 'ublue.png' 'VGUI2.jpg'; do
+    rm -f -- "/usr/share/wallpapers/$wallpaper"
+done
+
+install -d /usr/share/backgrounds
+ln -sfn /usr/share/wallpapers/Fox1/contents/images/2560x1080.jxl \
+    /usr/share/backgrounds/default.jxl
+ln -sfn /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl \
+    /usr/share/backgrounds/default-dark.jxl
+ln -sfn /usr/share/wallpapers/Fox1/contents/images_dark/2560x1080.jxl \
+    /usr/share/wallpapers/convergence.jxl
+ln -sfn /usr/share/wallpapers/fox.png \
+    /usr/share/wallpapers/convergence.png
+
+# Update every *installed* Global Theme, including the just-installed Catppuccin
+# packages. This ensures Fox1 stays the default when switching Global Themes.
+for defaults in /usr/share/plasma/look-and-feel/*/contents/defaults; do
+    [[ -f "$defaults" ]] || continue
+    kwriteconfig6 --file "$defaults" --group Wallpaper --key Image Fox1
+done
+
+# System defaults for *new profiles*. Existing per-user KConfig entries win.
+install -d /etc/xdg
+kwriteconfig6 --file /etc/xdg/kdeglobals \
+    --group KDE --key LookAndFeelPackage Catppuccin-Mocha-Sapphire
+kwriteconfig6 --file /etc/xdg/kdeglobals \
+    --group General --key ColorScheme CatppuccinMochaSapphire
+kwriteconfig6 --file /etc/xdg/kdeglobals \
+    --group Icons --key Theme kora
+kwriteconfig6 --file /etc/xdg/kcminputrc \
+    --group Mouse --key cursorTheme catppuccin-mocha-sapphire-cursors
+
+log 'Agate theming complete: Mocha Sapphire + Kora + Fox1; Frappe/Latte available, PlasMusic installed'
