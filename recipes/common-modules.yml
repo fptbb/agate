@@ -17,7 +17,6 @@ modules:
   - from-file: common-dev.yml
   - from-file: common-dux.yml
   - from-file: common-theming.yml
-  - from-file: common-dotfiles.yml
   - from-file: common-cleanup.yml
 
   # Branding Related Modules

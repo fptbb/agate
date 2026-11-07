@@ -1,9 +1,0 @@
-[Unit]
-Description=Sync dotfiles and discover new files
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/ujust dotfiles-sync
-RuntimeMaxSec=300
-StandardOutput=journal
-StandardError=journal

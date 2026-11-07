@@ -1,16 +1,81 @@
 set lazy
 
-# Unlocks Bitwarden CLI session and stores it in the system keyring for secure access
-unlock-bitwarden:
+# Manage Bitwarden CLI sessions using the system keyring
+[group("system")]
+bitwarden $action="":
     #!/usr/bin/env bash
     set -euo pipefail
-    # This depends on user having this on zshrc or bashrc:
-    # if command -v secret-tool >/dev/null 2>&1; then export BW_SESSION="$(secret-tool lookup application bitwarden-cli type session)" fi
-    # or on fish:
-    # if command -v secret-tool >/dev/null 2>&1; then set -x BW_SESSION (secret-tool lookup application bitwarden-cli type session) end
-    bw unlock --raw | secret-tool store \
-        --label="Bitwarden CLI Session" \
-        application bitwarden-cli type session
+
+    # Display help
+    if [[ -z "$action" || "$action" == "help" ]]; then
+        echo "Usage: ujust bitwarden <action>"
+        echo ""
+        echo "Available actions:"
+        echo "  status  - Show vault and stored session status"
+        echo "  unlock  - Unlock vault and save session to KWallet"
+        echo "  lock    - Lock vault and remove stored session"
+        echo "  sync    - Synchronize vault with Bitwarden"
+        exit 0
+    fi
+
+    # Check dependencies
+    for cmd in bw secret-tool; do
+        command -v "$cmd" >/dev/null 2>&1 || {
+            echo "error: '$cmd' is not installed" >&2
+            exit 1
+        }
+    done
+
+    # Retrieve the stored session without exporting it globally
+    session="$(secret-tool lookup \
+        application bitwarden-cli type session 2>/dev/null || true)"
+
+    case "$action" in
+        status)
+            if [[ -n "$session" ]]; then
+                echo "KWallet session: stored"
+                BW_SESSION="$session" bw status
+            else
+                echo "KWallet session: missing"
+                env -u BW_SESSION bw status
+            fi
+            ;;
+
+        unlock)
+            echo "Unlocking Bitwarden..."
+
+            env -u BW_SESSION bw unlock --raw |
+                secret-tool store \
+                    --label="Bitwarden CLI Session" \
+                    application bitwarden-cli type session
+
+            echo "Session saved to KWallet."
+            ;;
+
+        lock)
+            bw lock
+
+            secret-tool clear \
+                application bitwarden-cli type session
+
+            echo "Vault locked and KWallet session cleared."
+            ;;
+
+        sync)
+            [[ -n "$session" ]] || {
+                echo "error: no stored session. Run 'ujust bitwarden unlock'." >&2
+                exit 1
+            }
+
+            BW_SESSION="$session" bw sync
+            ;;
+
+        *)
+            echo "error: unknown action '$action'" >&2
+            echo "Run 'ujust bitwarden' for help." >&2
+            exit 1
+            ;;
+    esac
 
 # Enable or disable optional background services
 [group("system")]
@@ -225,88 +290,198 @@ container action="":
             ;;
     esac
 
-toggle-tor:
-    #!/usr/bin/bash
+# Manage the system-wide Tor transparent proxy
+[group("system")]
+toggle-tor $action="":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-    # resolves missing user from atomic build process
-    if ! getent passwd toranon > /dev/null; then
-        sudo useradd -r -M -d /var/lib/tor -s /sbin/nologin toranon
+    # Display help
+    if [[ -z "$action" || "$action" == "help" ]]; then
+        echo "Usage: ujust toggle-tor <action>"
+        echo ""
+        echo "Available actions:"
+        echo "  enable   - Enable Tor transparent proxy"
+        echo "  disable  - Disable Tor and remove firewall rules"
+        echo "  toggle   - Switch between enabled and disabled"
+        echo "  status   - Show Tor service and proxy status"
+        exit 0
     fi
 
-    # fixes strict unix permissions and selinux contexts required by fedora policy
-    for dir in /var/lib/tor /run/tor /var/log/tor; do
-        if [ ! -d "$dir" ]; then
-            sudo mkdir -p "$dir"
-        fi
-        sudo chown -R toranon:toranon "$dir"
-        sudo chmod 700 "$dir"
-        sudo restorecon -R "$dir" 2>/dev/null || true
+    # Validate action
+    case "$action" in
+        enable|disable|toggle|status) ;;
+        *)
+            echo "error: unknown action '$action'" >&2
+            exit 1
+            ;;
+    esac
+
+    for cmd in sudo nft systemctl; do
+        command -v "$cmd" >/dev/null || {
+            echo "error: missing dependency '$cmd'" >&2
+            exit 1
+        }
     done
 
-    # overrides fedora selinux confinement to allow tor to bind to proxy ports >1024
-    if command -v getsebool >/dev/null 2>&1; then
-        if [ "$(getsebool tor_bind_all_unreserved_ports | awk '{print $3}')" != "on" ]; then
-            echo "configuring selinux boolean..."
-            sudo setsebool -P tor_bind_all_unreserved_ports 1
+    # Authenticate before making system changes
+    sudo -v
+
+    # Check existing nftables tables
+    has_ipv4() {
+        sudo nft list table ip tor_proxy >/dev/null 2>&1
+    }
+
+    has_ipv6() {
+        sudo nft list table ip6 tor_proxy_v6 >/dev/null 2>&1
+    }
+
+    # Display current state
+    show_status() {
+        if has_ipv4 && has_ipv6; then
+            echo "Tor proxy: enabled"
+        elif has_ipv4 || has_ipv6; then
+            echo "Tor proxy: partially configured"
+        else
+            echo "Tor proxy: disabled"
         fi
-    fi
 
-    if sudo nft list table ip tor_proxy >/dev/null 2>&1; then
-        echo "disabling tor transparent proxy..."
+        echo "Tor service: $(systemctl is-active tor.service 2>/dev/null || true)"
+    }
 
-        sudo nft delete table ip tor_proxy
-        sudo nft delete table ip6 tor_proxy_v6 2>/dev/null || true
+    # Remove firewall rules and stop Tor
+    disable_proxy() {
+        echo "Disabling Tor transparent proxy..."
+
+        if has_ipv4; then
+            sudo nft delete table ip tor_proxy
+        fi
+
+        if has_ipv6; then
+            sudo nft delete table ip6 tor_proxy_v6
+        fi
+
         sudo systemctl stop tor.service
+        echo "Tor proxy disabled."
+    }
 
-        echo "tor proxy disabled."
-    else
-        echo "enabling tor transparent proxy..."
+    # Configure and start transparent proxy
+    enable_proxy() {
+        if has_ipv4 && has_ipv6; then
+            echo "Tor proxy is already enabled."
+            sudo systemctl start tor.service
+            return
+        fi
 
+        if has_ipv4 || has_ipv6; then
+            echo "error: incomplete firewall configuration" >&2
+            echo "Run 'ujust toggle-tor disable' first." >&2
+            exit 1
+        fi
+
+        echo "Configuring Tor transparent proxy..."
+
+        # Restore missing service user
+        if ! getent passwd toranon >/dev/null; then
+            sudo useradd -r -M -U \
+                -d /var/lib/tor \
+                -s /sbin/nologin toranon
+        fi
+
+        # Configure directories and SELinux contexts
+        for dir in /var/lib/tor /run/tor /var/log/tor; do
+            sudo install -d -o toranon -g toranon -m 700 "$dir"
+            sudo chown -R toranon:toranon "$dir"
+
+            if command -v restorecon >/dev/null; then
+                sudo restorecon -R "$dir"
+            fi
+        done
+
+        # Allow Tor to bind to unreserved proxy ports
+        if command -v getsebool >/dev/null &&
+           getsebool tor_bind_all_unreserved_ports >/dev/null 2>&1; then
+
+            if [[ "$(getsebool tor_bind_all_unreserved_ports | awk '{print $3}')" != "on" ]]; then
+                echo "Configuring SELinux boolean..."
+                sudo setsebool -P tor_bind_all_unreserved_ports on
+            fi
+        fi
+
+        # IPv4 redirection and IPv6 leak prevention
+        rules="$(cat <<'NFT'
+    table ip tor_proxy {
+        chain nat_output {
+            type nat hook output priority -105; policy accept;
+
+            meta skuid "toranon" accept
+
+            udp dport 53 redirect to :9053
+            tcp dport 53 redirect to :9053
+
+            oifname "lo" accept
+            ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
+
+            tcp dport != 22 redirect to :9052
+        }
+
+        chain filter_output {
+            type filter hook output priority -5; policy drop;
+
+            meta skuid "toranon" accept
+
+            oifname "lo" accept
+            ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
+
+            ct state established,related accept
+        }
+    }
+
+    table ip6 tor_proxy_v6 {
+        chain filter_output {
+            type filter hook output priority -5; policy drop;
+            oifname "lo" accept
+        }
+    }
+    NFT
+    )"
+
+        # Verify firewall syntax before activation
+        printf '%s\n' "$rules" | sudo nft --check -f -
+
+        # Start Tor before activating redirection
         sudo systemctl start tor.service
 
-        # injects high-priority tables redirecting to custom ports 9052 and 9053
-        sudo nft -f - <<< '
-        table ip tor_proxy {
-            chain nat_output {
-                type nat hook output priority -105; policy accept;
+        if ! systemctl is-active --quiet tor.service; then
+            echo "error: Tor service failed to start" >&2
+            exit 1
+        fi
 
-                # allows tor daemon to bypass the proxy
-                meta skuid "toranon" accept
+        # Apply firewall rules atomically
+        printf '%s\n' "$rules" | sudo nft -f -
 
-                # intercepts all dns before loopback exemption to bypass systemd-resolved
-                udp dport 53 redirect to :9053
-                tcp dport 53 redirect to :9053
+        echo "Tor proxy enabled."
+    }
 
-                # exempts loopback and local network subnets from tor routing
-                oifname "lo" accept
-                ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
-
-                # redirects all remaining external tcp traffic to tor
-                tcp dport != 22 redirect to :9052
-            }
-            chain filter_output {
-                type filter hook output priority -5; policy drop;
-
-                # allows tor daemon outbound connections
-                meta skuid "toranon" accept
-
-                # allows local network egress
-                oifname "lo" accept
-                ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
-
-                # allows active tcp streams to continue
-                ct state established,related accept
-            }
-        }
-        table ip6 tor_proxy_v6 {
-            chain filter_output {
-                type filter hook output priority -5; policy drop;
-                oifname "lo" accept
-            }
-        }'
-
-        echo "tor proxy active."
-    fi
+    # Execute requested action
+    case "$action" in
+        enable)
+            enable_proxy
+            ;;
+        disable)
+            disable_proxy
+            ;;
+        toggle)
+            if has_ipv4 || has_ipv6; then
+                disable_proxy
+            else
+                enable_proxy
+            fi
+            ;;
+        status)
+            show_status
+            ;;
+    esac
 
 # Analyze Btrfs compression and deduplication, using Alpine if needed
 [group("system")]

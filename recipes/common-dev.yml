@@ -47,8 +47,8 @@ modules:
     validate: true
     include: # use just --fmt --check --unstable --justfile to validate justfiles
       - development.just
-      - fido.just
-      - gpg.just
+      - yubikey.just
+      - pgp.just
   - type: systemd
     system:
       enabled:
