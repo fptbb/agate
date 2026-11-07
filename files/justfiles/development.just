@@ -1,80 +1,97 @@
 set lazy
 
-# Install DevBox
-[group("system")]
-agate-devbox:
-    #!/usr/bin/bash
-    curl -fsSL https://get.jetify.com/devbox | bash
-
-# toggles specific background services mapped in ~/bin/sys/services.conf
-[group("system")]
-toggle-services action target="all":
-    #!/usr/bin/bash
+# Unlocks Bitwarden CLI session and stores it in the system keyring for secure access
+unlock-bitwarden:
+    #!/usr/bin/env bash
     set -euo pipefail
-    CONFIG_FILE="$HOME/.bin/sys/services.conf"
-    declare -A SERVICES
-    # safely exits if the configuration file is missing
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        echo "error: configuration file not found at $CONFIG_FILE"
-        echo "please create it using the format: 'name: unit1.service unit2.socket'"
-        exit 1
-    fi
-    # parses the configuration file line by line
-    while IFS=':' read -r key val; do
-        # trims leading and trailing whitespace
-        key=$(echo "$key" | xargs)
-        val=$(echo "$val" | xargs)
+    # This depends on user having this on zshrc or bashrc:
+    # if command -v secret-tool >/dev/null 2>&1; then export BW_SESSION="$(secret-tool lookup application bitwarden-cli type session)" fi
+    # or on fish:
+    # if command -v secret-tool >/dev/null 2>&1; then set -x BW_SESSION (secret-tool lookup application bitwarden-cli type session) end
+    bw unlock --raw | secret-tool store \
+        --label="Bitwarden CLI Session" \
+        application bitwarden-cli type session
 
-        # skips empty lines and comments
-        [[ -z "$key" || "$key" == \#* ]] && continue
+# Enable or disable optional background services
+[group("system")]
+toggle-services $action="" $target="all":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-        # handles formatting errors gracefully
-        if [[ -z "$val" ]]; then
-            echo "warning: skipping malformed line (missing services for '$key')"
-            continue
+    declare -A services=()
+
+    # Load configurations in precedence order
+    for file in \
+        /usr/share/agate/services.conf \
+        /etc/agate/services.conf \
+        "${XDG_CONFIG_HOME:-$HOME/.config}/agate/services.conf"; do
+
+        [[ -f "$file" ]] || continue
+
+        while IFS=: read -r name units || [[ -n "$name" ]]; do
+            name="${name//[[:space:]]/}"
+            [[ -z "$name" || "$name" == \#* ]] && continue
+
+            if [[ -z "${units//[[:space:]]/}" ]]; then
+                echo "warning: no units defined for '$name' in $file" >&2
+                continue
+            fi
+
+            services["$name"]="${units//\$USER/$USER}"
+        done < "$file"
+    done
+
+    # Show help when called without arguments
+    if [[ -z "$action" ]]; then
+        echo "Usage: ujust toggle-services <action> [target]"
+        echo ""
+        echo "Available actions:"
+        echo "  enable   - Enable and start services"
+        echo "  disable  - Disable and stop services"
+        echo ""
+        echo "Available targets:"
+        echo "  all"
+
+        if ((${#services[@]})); then
+            printf '%s\n' "${!services[@]}" | sort | sed 's/^/  /'
         fi
 
-        # expands the $USER variable for templated services like hhd
-        val="${val//\$USER/$USER}"
+        echo ""
+        echo "If [target] is omitted, all configured services are affected."
+        exit 0
+    fi
 
-        SERVICES["$key"]="$val"
-    done < "$CONFIG_FILE"
-    # ensures there is at least one valid service mapped before proceeding
-    if [[ ${#SERVICES[@]} -eq 0 ]]; then
-        echo "error: no valid service mappings found in $CONFIG_FILE"
+    # Validate action
+    case "$action" in
+        enable|disable) ;;
+        *)
+            echo "error: invalid action '$action'" >&2
+            exit 1
+            ;;
+    esac
+
+    if ((${#services[@]} == 0)); then
+        echo "error: no service mappings found" >&2
         exit 1
     fi
-    ACTION="{{ action }}"
-    TARGET="{{ target }}"
-    # validates the requested action
-    if [[ "$ACTION" != "enable" && "$ACTION" != "disable" ]]; then
-        echo "error: action must be 'enable' or 'disable'."
-        echo "usage: just toggle-services <enable|disable> [all|TARGET]"
-        exit 1
-    fi
-    # applies the systemctl state
-    toggle_units() {
-        local units=$1
-        if [[ "$ACTION" == "enable" ]]; then
-            sudo systemctl enable --now $units
-        else
-            sudo systemctl disable --now $units
-        fi
-    }
-    # processes targets
-    if [[ "$TARGET" == "all" ]]; then
-        echo "applying '$ACTION' to all optional services..."
-        for key in "${!SERVICES[@]}"; do
-            toggle_units "${SERVICES[$key]}"
-        done
-    elif [[ -n "${SERVICES[$TARGET]:-}" ]]; then
-        echo "applying '$ACTION' to $TARGET services..."
-        toggle_units "${SERVICES[$TARGET]}"
+
+    # Select targets
+    if [[ "$target" == "all" ]]; then
+        mapfile -t targets < <(printf '%s\n' "${!services[@]}" | sort)
+    elif [[ -n "${services[$target]:-}" ]]; then
+        targets=("$target")
     else
-        echo "error: unknown target '$TARGET'."
-        echo "available targets: all, ${!SERVICES[@]}"
+        echo "error: unknown target '$target'" >&2
+        echo "available targets: all, ${!services[*]}" >&2
         exit 1
     fi
+
+    # Apply service state
+    for name in "${targets[@]}"; do
+        read -r -a units <<< "${services[$name]}"
+        echo "$action: $name (${units[*]})"
+        sudo systemctl "$action" --now "${units[@]}"
+    done
 
     echo "done."
 
@@ -290,3 +307,123 @@ toggle-tor:
 
         echo "tor proxy active."
     fi
+
+# Analyze Btrfs compression and deduplication, using Alpine if needed
+[group("system")]
+compsize-report $target="/var":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    IMAGE="docker.io/library/alpine:3.23"
+
+    # Validate the target and resolve its absolute path
+    target="$(realpath -e -- "$target")"
+
+    [[ "$(stat -f -c %T -- "$target")" == "btrfs" ]] || {
+        echo "error: target is not on a Btrfs filesystem" >&2
+        exit 1
+    }
+
+    # Authenticate before performing any work
+    echo "Authenticating..."
+    sudo -v
+
+    # Create a temporary working directory
+    tmp_root="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+    tmp_dir="$(mktemp -d "$tmp_root/agate-compsize.XXXXXXXX")"
+    mkdir -p "$tmp_dir/home"
+
+    report="$tmp_dir/report.txt"
+    remove_image=false
+
+    # Refresh sudo authentication while running
+    (
+        while sleep 30; do
+            sudo -n -v >/dev/null 2>&1 || break
+        done
+    ) &
+    keepalive_pid=$!
+
+    cleanup() {
+        local status=$?
+        trap - EXIT
+
+        kill "$keepalive_pid" 2>/dev/null || true
+        wait "$keepalive_pid" 2>/dev/null || true
+
+        if [[ "$remove_image" == true ]]; then
+            echo "Cleaning up Alpine image..."
+            sudo -n podman image rm "$IMAGE" >/dev/null 2>&1 ||
+                echo "warning: Alpine image could not be removed" >&2
+        fi
+
+        rm -rf -- "$tmp_dir"
+        exit "$status"
+    }
+    trap cleanup EXIT
+
+    echo "Analyzing: $target"
+
+    if command -v compsize >/dev/null 2>&1; then
+        # Fast path: use the installed host binary
+        echo "Using host compsize..."
+        sudo -n compsize -b -x "$target" > "$report"
+    else
+        # Fallback: run Alpine's compsize inside disposable Distrobox
+        echo "Host compsize unavailable; using Alpine..."
+
+        for cmd in distrobox podman; do
+            command -v "$cmd" >/dev/null || {
+                echo "error: missing fallback dependency '$cmd'" >&2
+                exit 1
+            }
+        done
+
+        if ! sudo -n podman image exists "$IMAGE"; then
+            remove_image=true
+        fi
+
+        distrobox ephemeral \
+            --root \
+            --image "$IMAGE" \
+            --home "$tmp_dir/home" \
+            --volume "$target:/mnt/agate-target:ro" \
+            --volume "$tmp_dir:/mnt/agate-results:rw" \
+            --additional-flags "--privileged" \
+            --pre-init-hooks 'apk add --no-cache btrfs-compsize >/dev/null && /usr/sbin/compsize -b -x /mnt/agate-target > /mnt/agate-results/report.txt' \
+            --yes \
+            -- true
+    fi
+
+    [[ -s "$report" ]] || {
+        echo "error: compsize analysis failed or returned no data" >&2
+        exit 1
+    }
+
+    # Format results from raw byte counts
+    awk -v target="$target" '
+        /^TOTAL[[:space:]]/ {
+            found = 1
+            disk = $3
+            uncomp = $4
+            ref = $5
+            gib = 1073741824
+
+            printf "\033[1;34mBtrfs Analysis: %s\033[0m\n", target
+            print "---------------------------------------------"
+            printf "Logical size:        %.2f GiB\n", ref / gib
+            printf "Physical disk usage: %.2f GiB\n", disk / gib
+            printf "Total space saved:   \033[1;32m%.2f GiB\033[0m\n", (ref - disk) / gib
+            print ""
+            printf "Reflinks/dedup:      %.2f GiB\n", (ref - uncomp) / gib
+            printf "Compression:         %.2f GiB\n", (uncomp - disk) / gib
+            print "---------------------------------------------"
+        }
+
+        END {
+            if (!found) {
+                print "error: no TOTAL result found" > "/dev/stderr"
+                exit 1
+            }
+        }
+    ' "$report"
