@@ -1,9 +1,9 @@
 # Agate OpenPGP, GnuPG, smartcard, and Git signing utilities.
 # Optional config: ${XDG_CONFIG_HOME:-~/.config}/agate/pgp.conf
-# Environment overrides: AGATE_PGP_KEY and AGATE_PGP_SERVERS.
+# Environment overrides: AGATE_PGP_KEY, AGATE_PGP_SERVERS.
 # Never store private keys or passwords in the configuration.
 [group("development")]
-pgp $action="" $target="" $key="":
+agate-pgp $action="" $target="" $key="" $option="":
     #!/usr/bin/env bash
     set -euo pipefail
     umask 077
@@ -23,7 +23,7 @@ pgp $action="" $target="" $key="":
         done < "$config"
     fi
     DEFAULT_KEY="${AGATE_PGP_KEY:-${config_key:-9F8D0697AD085F839D56C5DCD334181D1ABE834D}}"
-    read -r -a SERVERS <<< "${AGATE_PGP_SERVERS:-${config_servers:-hkps://keyserver.ubuntu.com hkps://keys.openpgp.org}}"
+    read -r -a SERVERS <<< "${AGATE_PGP_SERVERS:-${config_servers:-hkps://keys.openpgp.org hkps://keyserver.ubuntu.com hkps://keys.mailvelope.com hkps://pgp.mit.edu}}"
 
     die() { printf 'error: %s\n' "$*" >&2; exit 1; }
     info() { printf '%s\n' "$*" >&2; }
@@ -37,33 +37,47 @@ pgp $action="" $target="" $key="":
 
     help() {
         cat <<'HELP'
-    Usage: ujust pgp <action> [target] [key]
+    Usage: ujust agate-pgp <action> [target] [key] [option]
 
-    Keys and smartcards:
-      status                       Show default key, agent, and Git signing status
-      list [all|public|secret]     List keys in the local GPG keyring
-      card                         Show YubiKey/OpenPGP smartcard status
-      reload [pcscd]               Reload GPG agent; optionally restart PC/SC
-      import [file|ID|email]       Import from file, keyserver, WKD, stdin, or clipboard
-      search <email|query>         Search public keyservers without local import
-      refresh [key]                Refresh an existing key from a keyserver
-      export [key|select] [file]   Export public key to clipboard, stdout, or file
-      publish [key|select]         Publish a key to configured keyservers
-      edit [key|select]            Open the interactive GPG key editor
-      delete [key|select]          Delete a local public/secret key (with confirmation)
-      revoke [key|select] [file]   Create revocation certificate (optional local import)
+    Keys and security:
+      status                        Show GPG agent and Git signing state
+      list [all|public|secret]      List local public and secret keys
+      card                          Inspect OpenPGP smartcard / YubiKey
+      reload [pcscd]                Restart GPG stack; optionally restart PC/SC
+      doctor                        Diagnose GPG, smartcard, SSH agent and Git
+      audit                         Check key expiry, algorithms and capabilities
+      fingerprint [key|select]      Copy or print full fingerprint (optional QR)
+      import [file|ID|email]        Import a public key (file, WKD or server)
+      lookup <email|fingerprint>    Inspect remote keys, confirm before import
+      search <query>                Search keyservers without importing
+      refresh [key|select]         Refresh a known key
+      publish [key|select]         Publish a public key (confirmation)
+      publish-check [key|select]   Compare local and remote certificate copies
+      export [key|select] [file]   Export armored public key
+      edit [key|select]            Edit GPG key
+      trust [key|select]           Edit local ownertrust interactively
+      delete [key|select]          Delete local key (fingerprint confirmation)
+      revoke [key|select] [file]   Generate revocation certificate (NOT automatic)
+      rotate [key|select]          Guide key/subkey expiration or rotation
 
-    Crypto and Git:
-      encrypt [file|select] [key]  Encrypt file, piped input, or clipboard
-      decrypt [file]               Decrypt file, piped input, or clipboard to stdout
-      sign [file|select] [key]     Clear-sign file, piped input, or clipboard
-      verify [signature] [file]    Verify signed content or detached signature
-      git-sign [yubikey|select|off|status|key]
-                                   Choose the global Git signing identity
+    Cryptography and Git:
+      encrypt [file] [key] [--self] Encrypt files, stdin or Wayland clipboard
+      decrypt [file]               Decrypt to stdout
+      sign [file] [key] [--detach]  Clear-sign or create detached signature
+      verify [sig] [file]          Verify a signature
+      git-sign [gpg|ssh|off|status] [key|select] [global|local]
+                                    Configure Git signing; SSH uses SSH_AUTH_SOCK
 
-    Defaults: ~/.config/agate/pgp.conf (default_key=..., keyservers=...)
-    Environment overrides: AGATE_PGP_KEY and AGATE_PGP_SERVERS.
-    Use 'select' for interactive key selection; stdin/stdout in pipelines.
+    Backups:
+      backup [base-dir] [public|secret]     Save keys/ownertrust; encrypted secret option
+      restore <backup-dir> [public|all]    Verify and restore a backup
+
+    Config: ${XDG_CONFIG_HOME:-~/.config}/agate/pgp.conf
+      default_key=FULL_FINGERPRINT
+      keyservers=hkps://keys.openpgp.org hkps://keyserver.ubuntu.com
+
+    Environment overrides: AGATE_PGP_KEY, AGATE_PGP_SERVERS.
+    'select' opens a key picker. Clipboard is used when no file or piped input.
     HELP
     }
 
@@ -139,6 +153,25 @@ pgp $action="" $target="" $key="":
         fi
     }
 
+    tempdir() {
+        local root="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+        mkdir -p -- "$root"
+        mktemp -d "$root/agate-pgp.XXXXXXXX"
+    }
+
+    key_exists() {
+        [[ -n "$(fingerprint "$1" "${2:-public}" 2>/dev/null || true)" ]]
+    }
+
+    show_or_copy() {
+        if [[ -t 1 ]] && command -v wl-copy >/dev/null 2>&1; then
+            printf '%s\n' "$1" | wl-copy --type text/plain
+            info 'Copied to Wayland clipboard.'
+        else
+            printf '%s\n' "$1"
+        fi
+    }
+
     case "$action" in
         ''|help|-h|--help)
             help
@@ -153,6 +186,134 @@ pgp $action="" $target="" $key="":
             printf 'Git sign: %s\n' "$(git config --global --get commit.gpgsign 2>/dev/null || echo unset)"
             printf 'Git format: %s\n' "$(git config --global --get gpg.format 2>/dev/null || echo openpgp)"
             printf 'Git key: %s\n' "$(git config --global --get user.signingkey 2>/dev/null || echo unset)"
+            ;;
+        doctor)
+            need gpg
+            need gpgconf
+            info '=== OpenPGP diagnostics ==='
+            gpg --version | head -n 1
+            printf 'GPG home: %s\n' "$(gpgconf --list-dirs homedir)"
+            printf 'Agent socket: %s\n' "$(gpgconf --list-dirs agent-socket)"
+            if command -v gpg-connect-agent >/dev/null 2>&1 &&
+               gpg-connect-agent /bye >/dev/null 2>&1; then
+                info 'GPG agent: reachable'
+            else
+                info 'GPG agent: unavailable'
+            fi
+            if command -v timeout >/dev/null 2>&1; then
+                timeout 6 gpg --card-status >/dev/null 2>&1 && info 'OpenPGP card: detected' || info 'OpenPGP card: not detected or unavailable'
+            else
+                info 'OpenPGP card: check with ujust pgp card'
+            fi
+            if command -v systemctl >/dev/null 2>&1; then
+                printf 'PC/SC: %s\n' "$(systemctl is-active pcscd.socket 2>/dev/null || echo unavailable)"
+            fi
+            if command -v pinentry-qt >/dev/null 2>&1; then
+                info 'Pinentry: pinentry-qt installed'
+            elif command -v pinentry >/dev/null 2>&1; then
+                info 'Pinentry: installed'
+            else
+                info 'Pinentry: not found in PATH (agent may configure a custom path)'
+            fi
+            if [[ -n "${SSH_AUTH_SOCK:-}" && -S "$SSH_AUTH_SOCK" ]]; then
+                printf 'SSH agent socket: %s\n' "$SSH_AUTH_SOCK"
+                if command -v ssh-add >/dev/null 2>&1; then
+                    ssh-add -l || true
+                fi
+            else
+                info 'SSH agent: no active socket (check Bitwarden desktop if used)'
+            fi
+            if command -v git >/dev/null 2>&1; then
+                printf 'Git signing: %s (%s)\n' "$(git config --get commit.gpgsign || echo unset)" "$(git config --get gpg.format || echo openpgp)"
+                printf 'Git signing key: %s\n' "$(git config --get user.signingkey || echo unset)"
+            fi
+            info 'Use ujust pgp audit for key lifecycle checks.'
+            ;;
+        audit)
+            need gpg
+            info '=== Local public-key audit ==='
+            gpg --batch --with-colons --list-keys |
+                awk -F: -v now="$(date +%s)" '
+                function warn(msg) { printf "  WARNING: %s\n", msg; issues++ }
+                function expiry(x, kind) {
+                    if (x == "" || x == 0) return
+                    if (x < now) warn(kind " expired")
+                    else if (x < now + 90*86400) warn(kind " expires in " int((x-now)/86400) " days")
+                }
+                function finish() {
+                    if (!active) return
+                    if (!has_encryption) warn("no encryption-capable subkey found (may be intentional)")
+                }
+                $1 == "pub" {
+                    finish(); active=1; has_encryption=0
+                    printf "Key: %s (algorithm %s, %s bits)\n", $5, $4, $3
+                    if ($2 == "r") warn("revoked")
+                    if ($2 == "d") warn("disabled")
+                    if ($4 == 1 && $3+0 < 3072) warn("RSA key shorter than 3072 bits")
+                    expiry($7,"primary key")
+                    if (tolower($12) ~ /e/) has_encryption=1
+                }
+                $1 == "sub" {
+                    if (tolower($12) ~ /e/) has_encryption=1
+                    if ($4 == 1 && $3+0 < 3072) warn("RSA subkey shorter than 3072 bits")
+                    expiry($7,"subkey " $5)
+                }
+                END {finish(); print "Audit finished. Review warnings against your intended usage."}
+            '
+            info 'Secret-key stubs on hardware tokens are not backups. Audit cannot prove trust or recovery readiness.'
+            ;;
+        fingerprint)
+            need gpg
+            active="$(selected_key "$target" public)"
+            fpr="$(fingerprint "$active")"
+            [[ -n "$fpr" ]] || die 'public key not found'
+            if [[ "$key" == qr ]]; then
+                need qrencode
+                qrencode -t ANSIUTF8 "$fpr"
+            else
+                show_or_copy "$fpr"
+            fi
+            ;;
+        lookup)
+            need gpg
+            [[ -n "$target" ]] || die 'usage: ujust pgp lookup <email|fingerprint>'
+            tmp="$(tempdir)"
+            trap 'rm -rf -- "$tmp"' EXIT
+            chmod 700 "$tmp"
+            mkdir -m 700 "$tmp/gnupg"
+            found=false
+            if [[ "$target" == *'@'* ]]; then
+                for method in wkd dane keyserver; do
+                    info "Looking up $target via $method..."
+                    if [[ "$method" == keyserver ]]; then
+                        for server in "${SERVERS[@]}"; do
+                            if gpg --homedir "$tmp/gnupg" --batch --keyserver "$server" --keyserver-options timeout=10 \
+                                --auto-key-locate clear,nodefault,keyserver --locate-external-keys "$target" >/dev/null 2>&1; then
+                                found=true; break
+                            fi
+                        done
+                    elif gpg --homedir "$tmp/gnupg" --batch --auto-key-locate "clear,nodefault,$method" \
+                        --locate-external-keys "$target" >/dev/null 2>&1; then
+                        found=true
+                    fi
+                    [[ "$found" == true ]] && break
+                done
+            elif [[ "${target#0x}" =~ ^[[:xdigit:]]{16,64}$ ]]; then
+                for server in "${SERVERS[@]}"; do
+                    info "Looking up ${target#0x} at $server..."
+                    if gpg --homedir "$tmp/gnupg" --batch --keyserver "$server" --keyserver-options timeout=10 \
+                        --recv-keys "${target#0x}" >/dev/null 2>&1; then
+                        found=true; break
+                    fi
+                done
+            else
+                die 'provide an email address or a fingerprint/key ID of at least 16 hex characters'
+            fi
+            [[ "$found" == true ]] || die 'no remote key discovered'
+            info 'Discovered key (remote source does NOT prove identity):'
+            gpg --homedir "$tmp/gnupg" --list-keys --fingerprint --keyid-format LONG
+            confirm 'Import the displayed key(s) into your local keyring?'
+            gpg --homedir "$tmp/gnupg" --export | gpg --import
             ;;
         list)
             need gpg
@@ -261,6 +422,50 @@ pgp $action="" $target="" $key="":
             ((successes>0)) || die 'no keyserver accepted the key'
             info 'Publication finished. keys.openpgp.org requires email verification.'
             ;;
+        publish-check)
+            need gpg
+            active="$(selected_key "$target" public)"
+            fpr="$(fingerprint "$active")"
+            [[ -n "$fpr" ]] || die 'public key not found'
+            tmp="$(tempdir)"; trap 'rm -rf -- "$tmp"' EXIT
+            mkdir -m 700 "$tmp/gnupg"
+            local_hash="$(gpg --batch --export-options export-minimal --export "$fpr" | sha256sum | awk '{print $1}')"
+            for server in "${SERVERS[@]}"; do
+                info "Checking $server..."
+                if gpg --homedir "$tmp/gnupg" --batch --keyserver "$server" --keyserver-options timeout=10 \
+                    --recv-keys "$fpr" >/dev/null 2>&1; then
+                    remote_hash="$(gpg --homedir "$tmp/gnupg" --batch --export-options export-minimal --export "$fpr" | sha256sum | awk '{print $1}')"
+                    if [[ "$remote_hash" == "$local_hash" ]]; then
+                        printf '  %s: same minimal export\n' "$server"
+                    else
+                        printf '  %s: certificate differs (may strip UIDs/signatures)\n' "$server"
+                    fi
+                else
+                    printf '  %s: unavailable or not published\n' "$server"
+                fi
+                gpg --homedir "$tmp/gnupg" --batch --yes --delete-keys "$fpr" >/dev/null 2>&1 || true
+            done
+            ;;
+        rotate)
+            need gpg
+            active="$(selected_key "${target:-select}" secret)"
+            fpr="$(fingerprint "$active" secret)"
+            [[ -n "$fpr" ]] || die 'local secret key or card stub required'
+            info "Key: $fpr"
+            info 'Review subkeys, enter "key N" to select a subkey, "expire" to renew, "addkey" to create a new subkey, "save" to commit.'
+            info 'This interactive operation does not automatically publish or revoke older subkeys.'
+            confirm 'Launch the GnuPG key editor for rotation?'
+            gpg --edit-key "$fpr" < /dev/tty
+            ;;
+        trust)
+            need gpg
+            active="$(selected_key "${target:-select}" public)"
+            fpr="$(fingerprint "$active")"
+            [[ -n "$fpr" ]] || die 'key not found'
+            info 'Ownertrust determines how much this key may certify other identities; it does not itself verify identity.'
+            info 'Use the "trust" command in the editor, then "save".'
+            gpg --edit-key "$fpr" < /dev/tty
+            ;;
         edit)
             need gpg
             active="$(selected_key "${target:-select}" public)"
@@ -312,15 +517,36 @@ pgp $action="" $target="" $key="":
                 input="$target"
             fi
             if [[ "$action" == encrypt ]]; then
-                options=(--armor --recipient "$active" --encrypt)
+                local_self=false
+                if [[ "$option" == --self || "$key" == --self ]]; then
+                    local_self=true
+                    [[ "$key" == --self ]] && active="$DEFAULT_KEY"
+                elif [[ -n "$option" ]]; then
+                    die 'encrypt supports optional --self as the final argument'
+                fi
+                options=(--armor --trust-model auto --recipient "$active")
+                if [[ "$local_self" == true && "$active" != "$DEFAULT_KEY" ]]; then
+                    options+=(--recipient "$DEFAULT_KEY")
+                fi
+                options+=(--encrypt)
             else
-                options=(--armor --local-user "$active" --clearsign)
+                if [[ "$option" == --detach ]]; then
+                    options=(--armor --local-user "$active" --detach-sign)
+                elif [[ -z "$option" ]]; then
+                    options=(--armor --local-user "$active" --clearsign)
+                else
+                    die 'sign supports optional --detach as the final argument'
+                fi
             fi
             if [[ -n "$input" ]]; then
                 [[ -f "$input" ]] || die "file not found: $input"
-                [[ ! -e "${input}.asc" ]] || die "output already exists: ${input}.asc"
-                gpg --output "${input}.asc" "${options[@]}" -- "$input"
-                info "Created: ${input}.asc"
+                output="${input}.asc"
+                if [[ "$action" == sign && "$option" == --detach ]]; then
+                    output="${input}.sig.asc"
+                fi
+                [[ ! -e "$output" ]] || die "output already exists: $output"
+                gpg --output "$output" "${options[@]}" -- "$input"
+                info "Created: $output"
             else
                 crypto_stream "${options[@]}"
             fi
@@ -346,45 +572,114 @@ pgp $action="" $target="" $key="":
                 input_stream | gpg --verify
             fi
             ;;
+        backup)
+            need gpg
+            need sha256sum
+            base="${target:-${XDG_STATE_HOME:-$HOME/.local/state}/agate/pgp/backups}"
+            mode="${key:-public}"
+            [[ "$mode" == public || "$mode" == secret ]] || die 'backup mode must be public or secret'
+            mkdir -p -m 700 -- "$base"
+            bundle="$(mktemp -d "$base/backup-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXXXX")"
+            info "Writing backup to: $bundle"
+            gpg --export > "$bundle/public-keys.gpg"
+            gpg --export-ownertrust > "$bundle/ownertrust.txt"
+            if [[ -f "$config" ]]; then cp -- "$config" "$bundle/pgp.conf"; fi
+            if [[ "$mode" == secret ]]; then
+                info 'Secret-key backup requested. The encrypted export will require a separate passphrase.'
+                info 'Hardware-only keys/card stubs CANNOT be restored from a secret-key export.'
+                confirm 'Continue with an encrypted secret-key backup?'
+                gpg --export-secret-keys | gpg --symmetric --cipher-algo AES256 \
+                    --output "$bundle/secret-keys.gpg"
+                [[ -s "$bundle/secret-keys.gpg" ]] || die 'encrypted secret-key export is empty'
+            fi
+            (cd "$bundle" && sha256sum public-keys.gpg ownertrust.txt \
+                $( [[ -f pgp.conf ]] && printf 'pgp.conf ' ) \
+                $( [[ -f secret-keys.gpg ]] && printf 'secret-keys.gpg' ) > SHA256SUMS)
+            info 'Backup complete. Keep encrypted backups off-device and test restoration.'
+            ;;
+        restore)
+            need gpg
+            need sha256sum
+            [[ -n "$target" && -d "$target" ]] || die 'usage: ujust pgp restore <backup-dir> [public|all]'
+            mode="${key:-public}"
+            [[ "$mode" == public || "$mode" == all ]] || die 'restore mode must be public or all'
+            (cd "$target" && sha256sum -c SHA256SUMS) || die 'backup checksum validation failed'
+            info "Restoring local public keys from $target..."
+            gpg --import "$target/public-keys.gpg"
+            if [[ -s "$target/ownertrust.txt" ]]; then
+                info 'Importing ownertrust can change which keys your machine considers trusted.'
+                if [[ -t 0 ]]; then
+                    tty_read 'Import ownertrust? Type TRUST to confirm: '
+                    if [[ "$REPLY" == TRUST ]]; then gpg --import-ownertrust "$target/ownertrust.txt"; fi
+                else
+                    info 'Skipping ownertrust import (non-interactive session).'
+                fi
+            fi
+            if [[ "$mode" == all && -f "$target/secret-keys.gpg" ]]; then
+                confirm 'Decrypt and import encrypted private keys into this machine?'
+                gpg --decrypt "$target/secret-keys.gpg" | gpg --import
+            fi
+            info 'Restore finished. Validate your expected keys, card stubs and trust database.'
+            ;;
         git-sign)
             need git
-            if [[ -z "$target" ]]; then
-                cat >&2 <<'MENU'
-    Git commit signing:
-      1) YubiKey/default GPG key
-      2) Choose a GPG signing key
-      3) Disable commit signing
-      4) Show current settings
-    MENU
-                tty_read 'Select [1-4]: '
-                case "$REPLY" in
-                    1) target=yubikey ;;
-                    2) target=select ;;
-                    3) target=off ;;
-                    4) target=status ;;
-                    *) die 'invalid selection' ;;
-                esac
+            mode="${target:-status}"
+            scope="${option:-global}"
+            [[ "$scope" == global || "$scope" == local ]] || die 'scope must be global or local'
+            if [[ "$scope" == local ]]; then
+                git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die 'local Git scope requires a Git repository'
             fi
-            case "$target" in
-                off) git config --global commit.gpgsign false; info 'Commit signing disabled.' ;;
+            case "$mode" in
                 status)
-                    printf 'Signing enabled: %s\n' "$(git config --global --get commit.gpgsign || echo unset)"
-                    printf 'Signing format: %s\n' "$(git config --global --get gpg.format || echo openpgp)"
-                    printf 'Signing key: %s\n' "$(git config --global --get user.signingkey || echo unset)"
+                    printf 'Signing enabled: %s\n' "$(git config --get commit.gpgsign || echo unset)"
+                    printf 'Signing format: %s\n' "$(git config --get gpg.format || echo openpgp)"
+                    printf 'Signing key: %s\n' "$(git config --get user.signingkey || echo unset)"
                     ;;
-                *)
+                off)
+                    git config --"$scope" commit.gpgsign false
+                    info "Git commit signing disabled ($scope scope)."
+                    ;;
+                gpg|yubikey)
                     need gpg
-                    if [[ "$target" == yubikey ]]; then
-                        active="$DEFAULT_KEY"
-                    else
-                        active="$(selected_key "$target" secret)"
-                    fi
-                    [[ -n "$(fingerprint "$active" secret)" ]] || die 'signing secret key/stub unavailable'
-                    git config --global gpg.format openpgp
-                    git config --global user.signingkey "$active"
-                    git config --global commit.gpgsign true
-                    info "Git now signs commits using OpenPGP key: $active"
+                    active="$(selected_key "$key" secret)"
+                    fpr="$(fingerprint "$active" secret)"
+                    [[ -n "$fpr" ]] || die 'GPG signing key or card stub not available'
+                    git config --"$scope" gpg.format openpgp
+                    git config --"$scope" user.signingkey "$fpr"
+                    git config --"$scope" commit.gpgsign true
+                    info "Git OpenPGP signing enabled: $fpr ($scope scope)"
                     ;;
+                ssh)
+                    need ssh-add
+                    [[ -n "${SSH_AUTH_SOCK:-}" && -S "$SSH_AUTH_SOCK" ]] || die 'SSH_AUTH_SOCK does not point to an active SSH agent'
+                    if [[ "$key" == select ]]; then
+                        mapfile -t ssh_keys < <(ssh-add -L | grep -E '^ssh-|^sk-' || true)
+                        ((${#ssh_keys[@]} > 0)) || die 'no SSH public keys available from the agent'
+                        for i in "${!ssh_keys[@]}"; do
+                            printf '  %d) %s\n' "$((i+1))" "${ssh_keys[$i]}" >&2
+                        done
+                        tty_read 'Select SSH key number: '
+                        [[ "$REPLY" =~ ^[0-9]+$ ]] && ((10#$REPLY >= 1)) && ((10#$REPLY <= ${#ssh_keys[@]})) || die 'invalid selection'
+                        active="${ssh_keys[$((10#$REPLY-1))]}"
+                    elif [[ -f "$key" ]]; then
+                        IFS= read -r active < "$key"
+                    else
+                        active="$key"
+                    fi
+                    [[ "$active" == ssh-* || "$active" == sk-* ]] || die 'SSH signing requires an agent public key, public key file, or select'
+                    active_type="${active%% *}"
+                    active_data="${active#* }"; active_data="${active_data%% *}"
+                    [[ -n "$active_data" ]] || die 'invalid SSH public key format'
+                    if ! ssh-add -L | awk '{print $1" "$2}' | grep -Fxq "$active_type $active_data"; then
+                        die 'selected SSH signing key is not currently available in SSH_AUTH_SOCK'
+                    fi
+                    git config --"$scope" gpg.format ssh
+                    git config --"$scope" user.signingkey "$active"
+                    git config --"$scope" commit.gpgsign true
+                    info "Git SSH signing enabled ($scope scope). Bitwarden SSH Agent may ask for authorization."
+                    info 'For local signature verification, configure gpg.ssh.allowedSignersFile separately.'
+                    ;;
+                *) die 'git-sign accepts status, gpg, ssh, or off' ;;
             esac
             ;;
         *) die "unknown action '$action'; run 'ujust pgp' for help" ;;

@@ -2,13 +2,13 @@ set lazy
 
 # Manage Bitwarden CLI sessions using the system keyring
 [group("system")]
-bitwarden $action="":
+agate-bitwarden $action="":
     #!/usr/bin/env bash
     set -euo pipefail
 
     # Display help
     if [[ -z "$action" || "$action" == "help" ]]; then
-        echo "Usage: ujust bitwarden <action>"
+        echo "Usage: ujust agate-bitwarden <action>"
         echo ""
         echo "Available actions:"
         echo "  status  - Show vault and stored session status"
@@ -63,7 +63,7 @@ bitwarden $action="":
 
         sync)
             [[ -n "$session" ]] || {
-                echo "error: no stored session. Run 'ujust bitwarden unlock'." >&2
+                echo "error: no stored session. Run 'ujust agate-bitwarden unlock'." >&2
                 exit 1
             }
 
@@ -72,14 +72,14 @@ bitwarden $action="":
 
         *)
             echo "error: unknown action '$action'" >&2
-            echo "Run 'ujust bitwarden' for help." >&2
+            echo "Run 'ujust agate-bitwarden' for help." >&2
             exit 1
             ;;
     esac
 
 # Enable or disable optional background services
 [group("system")]
-toggle-services $action="" $target="all":
+agate-toggle-services $action="" $target="all":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -108,7 +108,7 @@ toggle-services $action="" $target="all":
 
     # Show help when called without arguments
     if [[ -z "$action" ]]; then
-        echo "Usage: ujust toggle-services <action> [target]"
+        echo "Usage: ujust agate-toggle-services <action> [target]"
         echo ""
         echo "Available actions:"
         echo "  enable   - Enable and start services"
@@ -169,14 +169,14 @@ malachite_link := "https://malachite.fpt.icu/"
 
 # Execute Malachite operations
 [group("system")]
-malachite action="" image="":
+agate-malachite action="" image="":
     #!/usr/bin/bash
     ACTION="{{ action }}"
     IMAGES="{{ if image == "" { malachite_images } else { image } }}"
 
     # prints usage instructions and available commands when executed without arguments
     if [ -z "$ACTION" ]; then
-        echo "Usage: ujust malachite <action> [image]"
+        echo "Usage: ujust agate-malachite <action> [image]"
         echo ""
         echo "Available actions:"
         echo "  apply   - Replaces and assembles containers from remote .ini configurations"
@@ -214,12 +214,12 @@ malachite action="" image="":
 
 # Container Cleanup (Podman/Docker)
 [group("system")]
-container action="":
+agate-container-cleanup action="":
     #!/usr/bin/bash
     ACTION="{{ action }}"
 
     if [ -z "$ACTION" ]; then
-        echo "Usage: ujust container <action>"
+        echo "Usage: ujust agate-container-cleanup <action>"
         echo ""
         echo "Available actions:"
         echo "  list  - Lists all containers, images, and volumes"
@@ -292,13 +292,13 @@ container action="":
 
 # Manage the system-wide Tor transparent proxy
 [group("system")]
-toggle-tor $action="":
+agate-toggle-tor $action="":
     #!/usr/bin/env bash
     set -euo pipefail
 
     # Display help
     if [[ -z "$action" || "$action" == "help" ]]; then
-        echo "Usage: ujust toggle-tor <action>"
+        echo "Usage: ujust agate-toggle-tor <action>"
         echo ""
         echo "Available actions:"
         echo "  enable   - Enable Tor transparent proxy"
@@ -485,7 +485,7 @@ toggle-tor $action="":
 
 # Analyze Btrfs compression and deduplication, using Alpine if needed
 [group("system")]
-compsize-report $target="/var":
+agate-compsize-report $target="/var":
     #!/usr/bin/env bash
     set -euo pipefail
 

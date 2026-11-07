@@ -1,7 +1,7 @@
 # Manage YubiKey FIDO2 disk unlocking and KDE/PAM authentication
 
 [group("system")]
-yubikey action="" target="":
+agate-yubikey action="" target="":
     #!/usr/bin/env bash
     set -euo pipefail
     action="$1"
@@ -12,7 +12,7 @@ yubikey action="" target="":
      MARKER="# Agate YubiKey (managed)"
      help() {
          cat <<'EOF'
-    Usage: ujust yubikey <action> [device]
+    Usage: ujust agate-yubikey <action> [device]
     LUKS:
       luks-enroll [device]  Enroll a FIDO2 key and configure crypttab
       luks-remove [device]  Remove FIDO2 slots and crypttab setting
