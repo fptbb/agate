@@ -5,16 +5,18 @@ modules:
       cleanup: true
       copr:
         # Dux Shell development build and its companion packages.
-        - avengemedia/dms # TODO: Change to duxlabs/dms in the future when they add it to the COPR repo
-        # Dux Files and shared Dux Labs packages (Quickshell, Dux Search, etc.).
-        - avengemedia/danklinux # TODO: Change it to duxlabs/dux in the future when they add it to the COPR repo
+        - duxlabs/dms
+        # Dux Labs packages (Quickshell, Dux Search, etc.).
+        - duxlabs/dux-repo
     install:
       packages:
         - niri
         - xwayland-satellite
         - dms
         - alacritty
-        #- dux-files # Disbled while they add it to the COPR repo
+        - dux-search
+        - dux-calendar
+        - dux-files
         - cava
         - cliphist
         - wl-clipboard
