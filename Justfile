@@ -98,5 +98,5 @@ clean:
 
 format-justfiles:
     #!/usr/bin/bash
-    just --fmt --unstable ./files/justfiles/
+    command find ./files/justfiles -type f \( -name '*.just' -o -name 'Justfile' -o -name 'justfile' \) -exec just --unstable --fmt --justfile '{}' \;
     echo "Justfiles formatted."

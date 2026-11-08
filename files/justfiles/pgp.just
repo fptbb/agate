@@ -36,49 +36,48 @@ agate-pgp $action="" $target="" $key="" $option="":
     confirm() { tty_read "$1 (type YES): "; [[ "$REPLY" == YES ]] || die 'cancelled'; }
 
     help() {
-        cat <<'HELP'
-    Usage: ujust agate-pgp <action> [target] [key] [option]
-
-    Keys and security:
-      status                        Show GPG agent and Git signing state
-      list [all|public|secret]      List local public and secret keys
-      card                          Inspect OpenPGP smartcard / YubiKey
-      reload [pcscd]                Restart GPG stack; optionally restart PC/SC
-      doctor                        Diagnose GPG, smartcard, SSH agent and Git
-      audit                         Check key expiry, algorithms and capabilities
-      fingerprint [key|select]      Copy or print full fingerprint (optional QR)
-      import [file|ID|email]        Import a public key (file, WKD or server)
-      lookup <email|fingerprint>    Inspect remote keys, confirm before import
-      search <query>                Search keyservers without importing
-      refresh [key|select]         Refresh a known key
-      publish [key|select]         Publish a public key (confirmation)
-      publish-check [key|select]   Compare local and remote certificate copies
-      export [key|select] [file]   Export armored public key
-      edit [key|select]            Edit GPG key
-      trust [key|select]           Edit local ownertrust interactively
-      delete [key|select]          Delete local key (fingerprint confirmation)
-      revoke [key|select] [file]   Generate revocation certificate (NOT automatic)
-      rotate [key|select]          Guide key/subkey expiration or rotation
-
-    Cryptography and Git:
-      encrypt [file] [key] [--self] Encrypt files, stdin or Wayland clipboard
-      decrypt [file]               Decrypt to stdout
-      sign [file] [key] [--detach]  Clear-sign or create detached signature
-      verify [sig] [file]          Verify a signature
-      git-sign [gpg|ssh|off|status] [key|select] [global|local]
-                                    Configure Git signing; SSH uses SSH_AUTH_SOCK
-
-    Backups:
-      backup [base-dir] [public|secret]     Save keys/ownertrust; encrypted secret option
-      restore <backup-dir> [public|all]    Verify and restore a backup
-
-    Config: ${XDG_CONFIG_HOME:-~/.config}/agate/pgp.conf
-      default_key=FULL_FINGERPRINT
-      keyservers=hkps://keys.openpgp.org hkps://keyserver.ubuntu.com
-
-    Environment overrides: AGATE_PGP_KEY, AGATE_PGP_SERVERS.
-    'select' opens a key picker. Clipboard is used when no file or piped input.
-    HELP
+        printf '%s\n' \
+            'Usage: ujust agate-pgp <action> [target] [key] [option]' \
+            '' \
+            'Keys and security:' \
+            '  status                        Show GPG agent and Git signing state' \
+            '  list [all|public|secret]      List local public and secret keys' \
+            '  card                          Inspect OpenPGP smartcard / YubiKey' \
+            '  reload [pcscd]                Restart GPG stack; optionally restart PC/SC' \
+            '  doctor                        Diagnose GPG, smartcard, SSH agent and Git' \
+            '  audit                         Check key expiry, algorithms and capabilities' \
+            '  fingerprint [key|select]      Copy or print full fingerprint (optional QR)' \
+            '  import [file|ID|email]        Import a public key (file, WKD or server)' \
+            '  lookup <email|fingerprint>    Inspect remote keys, confirm before import' \
+            '  search <query>                Search keyservers without importing' \
+            '  refresh [key|select]         Refresh a known key' \
+            '  publish [key|select]         Publish a public key (confirmation)' \
+            '  publish-check [key|select]   Compare local and remote certificate copies' \
+            '  export [key|select] [file]   Export armored public key' \
+            '  edit [key|select]            Edit GPG key' \
+            '  trust [key|select]           Edit local ownertrust interactively' \
+            '  delete [key|select]          Delete local key (fingerprint confirmation)' \
+            '  revoke [key|select] [file]   Generate revocation certificate (NOT automatic)' \
+            '  rotate [key|select]          Guide key/subkey expiration or rotation' \
+            '' \
+            'Cryptography and Git:' \
+            '  encrypt [file] [key] [--self] Encrypt files, stdin or Wayland clipboard' \
+            '  decrypt [file]               Decrypt to stdout' \
+            '  sign [file] [key] [--detach]  Clear-sign or create detached signature' \
+            '  verify [sig] [file]          Verify a signature' \
+            '  git-sign [gpg|ssh|off|status] [key|select] [global|local]' \
+            '                                Configure Git signing; SSH uses SSH_AUTH_SOCK' \
+            '' \
+            'Backups:' \
+            '  backup [base-dir] [public|secret]     Save keys/ownertrust; encrypted secret option' \
+            '  restore <backup-dir> [public|all]    Verify and restore a backup' \
+            '' \
+            'Config: ${XDG_CONFIG_HOME:-~/.config}/agate/pgp.conf' \
+            '  default_key=FULL_FINGERPRINT' \
+            '  keyservers=hkps://keys.openpgp.org hkps://keyserver.ubuntu.com' \
+            '' \
+            'Environment overrides: AGATE_PGP_KEY, AGATE_PGP_SERVERS.' \
+            "'select' opens a key picker. Clipboard is used when no file or piped input."
     }
 
     # Select a full fingerprint, rather than an ambiguous short key ID.
@@ -203,7 +202,7 @@ agate-pgp $action="" $target="" $key="" $option="":
             if command -v timeout >/dev/null 2>&1; then
                 timeout 6 gpg --card-status >/dev/null 2>&1 && info 'OpenPGP card: detected' || info 'OpenPGP card: not detected or unavailable'
             else
-                info 'OpenPGP card: check with ujust pgp card'
+                info 'OpenPGP card: check with ujust agate-pgp card'
             fi
             if command -v systemctl >/dev/null 2>&1; then
                 printf 'PC/SC: %s\n' "$(systemctl is-active pcscd.socket 2>/dev/null || echo unavailable)"
@@ -227,7 +226,7 @@ agate-pgp $action="" $target="" $key="" $option="":
                 printf 'Git signing: %s (%s)\n' "$(git config --get commit.gpgsign || echo unset)" "$(git config --get gpg.format || echo openpgp)"
                 printf 'Git signing key: %s\n' "$(git config --get user.signingkey || echo unset)"
             fi
-            info 'Use ujust pgp audit for key lifecycle checks.'
+            info 'Use ujust agate-pgp audit for key lifecycle checks.'
             ;;
         audit)
             need gpg
@@ -276,7 +275,7 @@ agate-pgp $action="" $target="" $key="" $option="":
             ;;
         lookup)
             need gpg
-            [[ -n "$target" ]] || die 'usage: ujust pgp lookup <email|fingerprint>'
+            [[ -n "$target" ]] || die 'usage: ujust agate-pgp lookup <email|fingerprint>'
             tmp="$(tempdir)"
             trap 'rm -rf -- "$tmp"' EXIT
             chmod 700 "$tmp"
@@ -369,7 +368,7 @@ agate-pgp $action="" $target="" $key="" $option="":
             ;;
         search)
             need gpg
-            [[ -n "$target" ]] || die 'usage: ujust pgp search <email|query>'
+            [[ -n "$target" ]] || die 'usage: ujust agate-pgp search <email|query>'
             found=false
             for server in "${SERVERS[@]}"; do
                 info "Searching $server..."
@@ -600,7 +599,7 @@ agate-pgp $action="" $target="" $key="" $option="":
         restore)
             need gpg
             need sha256sum
-            [[ -n "$target" && -d "$target" ]] || die 'usage: ujust pgp restore <backup-dir> [public|all]'
+            [[ -n "$target" && -d "$target" ]] || die 'usage: ujust agate-pgp restore <backup-dir> [public|all]'
             mode="${key:-public}"
             [[ "$mode" == public || "$mode" == all ]] || die 'restore mode must be public or all'
             (cd "$target" && sha256sum -c SHA256SUMS) || die 'backup checksum validation failed'
@@ -682,5 +681,5 @@ agate-pgp $action="" $target="" $key="" $option="":
                 *) die 'git-sign accepts status, gpg, ssh, or off' ;;
             esac
             ;;
-        *) die "unknown action '$action'; run 'ujust pgp' for help" ;;
+        *) die "unknown action '$action'; run 'ujust agate-pgp' for help" ;;
     esac

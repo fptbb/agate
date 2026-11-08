@@ -160,63 +160,135 @@ agate-toggle-services $action="" $target="all":
 
     echo "done."
 
-# Malachite Configuration
-malachite_json := "/usr/share/agate/malachite.json"
-
-malachite_images := `curl -fsSL https://malachite.fpt.icu/images.json | jq -r '.images | keys[]' | xargs`
-malachite_repo := `curl -fsSL https://malachite.fpt.icu/images.json | jq -r '"\(.registry)/\(.namespace)/\(.image_name)"'`
-malachite_link := "https://malachite.fpt.icu/"
-
-# Execute Malachite operations
+# Manage Malachite Distrobox containers
 [group("system")]
-agate-malachite action="" image="":
-    #!/usr/bin/bash
-    ACTION="{{ action }}"
-    IMAGES="{{ if image == "" { malachite_images } else { image } }}"
+agate-malachite $action="" $image="":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-    # prints usage instructions and available commands when executed without arguments
-    if [ -z "$ACTION" ]; then
+    URL="https://malachite.fpt.icu"
+    ACTION="$action"
+    IMAGE="$image"
+
+    # Display help
+    if [[ -z "$ACTION" || "$ACTION" == "help" ]]; then
         echo "Usage: ujust agate-malachite <action> [image]"
         echo ""
         echo "Available actions:"
-        echo "  apply   - Replaces and assembles containers from remote .ini configurations"
-        echo "  update  - Pulls the latest base image and runs distrobox upgrade"
-        echo "  purge   - Forcefully removes the containers"
+        echo "  list    - List available Malachite images"
+        echo "  apply   - Assemble containers from remote configurations"
+        echo "  update  - Pull latest images and upgrade containers"
+        echo "  purge   - Forcefully remove containers"
         echo ""
-        echo "If [image] is omitted, actions are applied to: $IMAGES"
+        echo "If [image] is omitted, actions apply to all available images."
         exit 0
     fi
 
-    for img in $IMAGES; do
-        # routes the requested action to the corresponding distrobox operation
-        case $ACTION in
-            apply)
-                assemble=$(curl -fsSL https://malachite.fpt.icu/images.json | jq -r --arg img "$img" '.images[$img].assemble')
-                echo "Applying configuration for malachite-$img..."
-                distrobox assemble create --replace --file "{{ malachite_link }}$assemble"
-                ;;
-            update)
-                echo "Updating malachite-$img..."
-                podman pull {{ malachite_repo }}:$img
-                distrobox upgrade $img
-                ;;
-            purge)
-                echo "Purging malachite-$img..."
-                distrobox rm -f $img
-                ;;
-            *)
-                echo "Error: Invalid action '$ACTION'."
-                echo "Valid actions are: apply, update, purge"
+    # Validate action
+    case "$ACTION" in
+        list|apply|update|purge) ;;
+        *)
+            echo "error: unknown action '$ACTION'" >&2
+            exit 1
+            ;;
+    esac
+
+    # Check dependencies
+    for cmd in curl jq; do
+        command -v "$cmd" >/dev/null || {
+            echo "error: missing dependency '$cmd'" >&2
+            exit 1
+        }
+    done
+
+    # Fetch metadata once, only when requested
+    JSON="$(curl -fsSL --connect-timeout 10 "$URL/images.json")"
+
+    jq -e '.images | type == "object"' >/dev/null <<< "$JSON" || {
+        echo "error: invalid Malachite image metadata" >&2
+        exit 1
+    }
+
+    # List available images
+    if [[ "$ACTION" == "list" ]]; then
+        echo "Available Malachite images:"
+        echo ""
+
+        jq -r '
+            .images
+            | to_entries
+            | sort_by(.key)[]
+            | "  \(.key) - \(.value.title): \(.value.summary)"
+        ' <<< "$JSON"
+
+        exit 0
+    fi
+
+    # Resolve requested images
+    if [[ -n "$IMAGE" ]]; then
+        jq -e --arg img "$IMAGE" '.images | has($img)' \
+            >/dev/null <<< "$JSON" || {
+                echo "error: unknown image '$IMAGE'" >&2
+                echo "Run 'ujust agate-malachite list' for available images." >&2
                 exit 1
+            }
+
+        images=("$IMAGE")
+    else
+        mapfile -t images < <(jq -r '.images | keys[]' <<< "$JSON")
+    fi
+
+    # Check action dependencies
+    case "$ACTION" in
+        apply|update)
+            command -v distrobox >/dev/null || {
+                echo "error: distrobox is missing" >&2
+                exit 1
+            }
+            ;;
+    esac
+
+    if [[ "$ACTION" == "update" ]]; then
+        command -v podman >/dev/null || {
+            echo "error: podman is missing" >&2
+            exit 1
+        }
+    fi
+
+    # Execute requested action
+    for img in "${images[@]}"; do
+        echo "Processing malachite-$img..."
+
+        case "$ACTION" in
+            apply)
+                assemble="$(jq -er --arg img "$img" \
+                    '.images[$img].assemble' <<< "$JSON")"
+
+                distrobox assemble create --replace \
+                    --file "$URL/$assemble"
+                ;;
+
+            update)
+                reference="$(jq -er --arg img "$img" \
+                    '.images[$img].reference' <<< "$JSON")"
+
+                podman pull "$reference"
+                distrobox upgrade "$img"
+                ;;
+
+            purge)
+                distrobox rm -f "$img"
                 ;;
         esac
     done
 
+    echo "Done."
+
 # Container Cleanup (Podman/Docker)
 [group("system")]
-agate-container-cleanup action="":
+agate-container-cleanup $action="":
     #!/usr/bin/bash
-    ACTION="{{ action }}"
+    ACTION="$action"
 
     if [ -z "$ACTION" ]; then
         echo "Usage: ujust agate-container-cleanup <action>"
@@ -375,7 +447,7 @@ agate-toggle-tor $action="":
 
         if has_ipv4 || has_ipv6; then
             echo "error: incomplete firewall configuration" >&2
-            echo "Run 'ujust toggle-tor disable' first." >&2
+            echo "Run 'ujust agate-toggle-tor disable' first." >&2
             exit 1
         fi
 
@@ -409,42 +481,40 @@ agate-toggle-tor $action="":
         fi
 
         # IPv4 redirection and IPv6 leak prevention
-        rules="$(cat <<'NFT'
-    table ip tor_proxy {
-        chain nat_output {
-            type nat hook output priority -105; policy accept;
-
-            meta skuid "toranon" accept
-
-            udp dport 53 redirect to :9053
-            tcp dport 53 redirect to :9053
-
-            oifname "lo" accept
-            ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
-
-            tcp dport != 22 redirect to :9052
-        }
-
-        chain filter_output {
-            type filter hook output priority -5; policy drop;
-
-            meta skuid "toranon" accept
-
-            oifname "lo" accept
-            ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept
-
-            ct state established,related accept
-        }
-    }
-
-    table ip6 tor_proxy_v6 {
-        chain filter_output {
-            type filter hook output priority -5; policy drop;
-            oifname "lo" accept
-        }
-    }
-    NFT
-    )"
+        rules="$(printf '%s\n' \
+            'table ip tor_proxy {' \
+            '    chain nat_output {' \
+            '        type nat hook output priority -105; policy accept;' \
+            '' \
+            '        meta skuid "toranon" accept' \
+            '' \
+            '        udp dport 53 redirect to :9053' \
+            '        tcp dport 53 redirect to :9053' \
+            '' \
+            '        oifname "lo" accept' \
+            '        ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept' \
+            '' \
+            '        tcp dport != 22 redirect to :9052' \
+            '    }' \
+            '' \
+            '    chain filter_output {' \
+            '        type filter hook output priority -5; policy drop;' \
+            '' \
+            '        meta skuid "toranon" accept' \
+            '' \
+            '        oifname "lo" accept' \
+            '        ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } accept' \
+            '' \
+            '        ct state established,related accept' \
+            '    }' \
+            '}' \
+            '' \
+            'table ip6 tor_proxy_v6 {' \
+            '    chain filter_output {' \
+            '        type filter hook output priority -5; policy drop;' \
+            '        oifname "lo" accept' \
+            '    }' \
+            '}')"
 
         # Verify firewall syntax before activation
         printf '%s\n' "$rules" | sudo nft --check -f -
