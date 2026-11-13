@@ -7,7 +7,6 @@ modules:
       nerd-fonts:
         - FiraCode
         - FiraMono
-        - NerdFontsSymbolsOnly
   - type: justfiles
     validate: true
     include:
