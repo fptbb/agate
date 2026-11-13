@@ -63,14 +63,18 @@ jobs:
       matrix:
         recipe: ${{ fromJson(needs.check-update.outputs.recipes || '["recipe.yml", "recipe-testing.yml"]') }}
 
+
     steps:
       - name: Maximize build space
         uses: ublue-os/container-storage-action@main
 
-      - name: Install Cosign for key validation
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Cosign
         uses: sigstore/cosign-installer@v4.1.2
 
-      - name: Validate signing keys
+      - name: Prepare and validate Cosign keys
         shell: bash
         env:
             COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
@@ -78,26 +82,40 @@ jobs:
             COSIGN_PASSWORD: ""
         run: |
             set -euo pipefail
-            : "${COSIGN_PRIVATE_KEY:?Missing COSIGN_PRIVATE_KEY secret}"
-            : "${COSIGN_PUBLIC_KEY:?Missing COSIGN_PUBLIC_KEY variable}"
-
             umask 077
-            KEY_FILE="$(mktemp)"
-            PUB_FILE="$(mktemp)"
-            DERIVED_FILE="$(mktemp)"
-            trap 'rm -f "$KEY_FILE" "$PUB_FILE" "$DERIVED_FILE"' EXIT
 
-            printf '%s\n' "$COSIGN_PRIVATE_KEY" > "$KEY_FILE"
-            printf '%s\n' "$COSIGN_PUBLIC_KEY" > "$PUB_FILE"
+            : "${COSIGN_PRIVATE_KEY:?Missing private key}"
+            : "${COSIGN_PUBLIC_KEY:?Missing public key}"
 
-            echo "Validating private key with empty password..."
+            # Generate the public key directly from the private key
             cosign public-key \
-                --key "$KEY_FILE" \
-                > "$DERIVED_FILE"
+                --key env://COSIGN_PRIVATE_KEY \
+                > cosign.pub
 
-            echo "Comparing public keys..."
-            if ! cmp -s "$PUB_FILE" "$DERIVED_FILE"; then
-                echo "ERROR: Public and private keys do not match."
+            # Write configured public key for comparison
+            printf '%s\n' "$COSIGN_PUBLIC_KEY" \
+                > "$RUNNER_TEMP/configured.pub"
+
+            # Convert both public keys to canonical DER
+            openssl pkey -pubin \
+                -in cosign.pub \
+                -outform DER \
+                -out "$RUNNER_TEMP/derived.der"
+
+            openssl pkey -pubin \
+                -in "$RUNNER_TEMP/configured.pub" \
+                -outform DER \
+                -out "$RUNNER_TEMP/configured.der"
+
+            # Compare actual cryptographic key data
+            if ! cmp -s \
+                "$RUNNER_TEMP/derived.der" \
+                "$RUNNER_TEMP/configured.der"; then
+                echo "ERROR: GitHub private and public keys differ."
+                echo "Public-key fingerprints:"
+                sha256sum \
+                "$RUNNER_TEMP/derived.der" \
+                "$RUNNER_TEMP/configured.der"
                 exit 1
             fi
 
@@ -108,12 +126,14 @@ jobs:
         with:
             recipe: ${{ matrix.recipe }}
             cosign_private_key: ${{ secrets.COSIGN_PRIVATE_KEY }}
-            cosign_public_key: ${{ vars.COSIGN_PUBLIC_KEY }}
             registry_token: ${{ github.token }}
             pr_event_number: ${{ github.event.number }}
+            cli_version: v0.9.42
             build_opts: --build-driver=podman --run-driver=podman
             use_cache: true
             maximize_build_space: false
+            skip_checkout: true
+
 
   cleanup-old-tags:
     name: Cleanup old tags
