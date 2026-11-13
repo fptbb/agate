@@ -113,52 +113,92 @@ build-image:
             - RECIPE:
                   - recipe.yml
     variables:
-        # configures a secure connection with docker-in-docker service
-        # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html
         DOCKER_HOST: tcp://docker:2376
         DOCKER_TLS_CERTDIR: /certs
-        DOCKER_TLS_VERIFY: 1
-        DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
+        DOCKER_TLS_VERIFY: "1"
+        DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+
     before_script:
-        # skips build on scheduled or simulated pipelines if no update is found
+        # Initialize force-build state, preserving update-check results
         - |
-            if [ "${FORCE_BUILD_INPUT}" = "true" ]; then FORCE_BUILD=true; fi
-            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$SIMULATE_SCHEDULE" = "true" ]; then
+            export FORCE_BUILD="${FORCE_BUILD:-false}"
+
+            if [ "${FORCE_BUILD_INPUT:-false}" = "true" ]; then
+              export FORCE_BUILD=true
+            fi
+
+            if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || \
+               [ "${SIMULATE_SCHEDULE:-false}" = "true" ]; then
               if [ "$FORCE_BUILD" != "true" ]; then
                 echo "No update found. Skipping build."
                 exit 0
               fi
             fi
-        # pulls secure files into the build
-        - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
-        - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
-        - docker login $BB_REGISTRY -u $BB_USERNAME -p $BB_PASSWORD
+
+        # Authenticate with the container registry
+        - |
+            : "${BB_REGISTRY:?Missing BB_REGISTRY}"
+            : "${BB_USERNAME:?Missing BB_USERNAME}"
+            : "${BB_PASSWORD:?Missing BB_PASSWORD}"
+
+            printf '%s' "$BB_PASSWORD" |
+              docker login "$BB_REGISTRY" \
+                --username "$BB_USERNAME" \
+                --password-stdin
+
     script:
-        # Restore the public signing key from GitLab CI variables
+        # Restore Cosign keys from GitLab CI variables
         - |
             set -eu
-            : "${COSIGN_PUBLIC_KEY:?COSIGN_PUBLIC_KEY is missing}"
 
+            : "${COSIGN_PUBLIC_KEY:?Missing COSIGN_PUBLIC_KEY}"
+            : "${COSIGN_PRIVATE_KEY:?Missing COSIGN_PRIVATE_KEY}"
+
+            # Public key: supports regular and file-type variables
             if [ -f "$COSIGN_PUBLIC_KEY" ]; then
-                # GitLab file-type variable
-                cp "$COSIGN_PUBLIC_KEY" ./cosign.pub
+              cp "$COSIGN_PUBLIC_KEY" ./cosign.pub
             else
-                # GitLab regular multiline variable
-                printf '%s\n' "$COSIGN_PUBLIC_KEY" > ./cosign.pub
+              printf '%s\n' "$COSIGN_PUBLIC_KEY" > ./cosign.pub
             fi
 
+            # Private key: supports regular and file-type variables
+            case "$COSIGN_PRIVATE_KEY" in
+              /*)
+                if [ -f "$COSIGN_PRIVATE_KEY" ]; then
+                  COSIGN_PRIVATE_KEY="$(cat "$COSIGN_PRIVATE_KEY")"
+                  export COSIGN_PRIVATE_KEY
+                fi
+                ;;
+            esac
+
+            # Verify the public key exists and has a PEM header
             test -s ./cosign.pub
-            grep -q '^-----BEGIN PUBLIC KEY-----' ./cosign.pub
-        - sleep 5 # delays execution to allow docker-in-docker service to start
-        - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
+            grep -q -- '^-----BEGIN PUBLIC KEY-----' ./cosign.pub
+
+            echo "Cosign signing keys configured."
+
+        # Allow Docker-in-Docker additional startup time
+        - sleep 5
+
+        # Build and push the image
         - |
+            echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
+
             BLUEBUILD_CACHE_FLAG=""
-            if [ "$FORCE_BUILD" != "true" ]; then
+
+            if [ "${FORCE_BUILD:-false}" != "true" ]; then
               BLUEBUILD_CACHE_FLAG="--cache-layers"
             else
               echo "FORCE_BUILD=true; rebuilding without layer cache."
             fi
-            bluebuild build --verbose $BLUEBUILD_CACHE_FLAG --compression-format zstd --push ./recipes/$RECIPE
+
+            bluebuild build \
+              --verbose \
+              $BLUEBUILD_CACHE_FLAG \
+              --compression-format zstd \
+              --push \
+              "./recipes/$RECIPE"
+
 
 publish-metadata:
     stage: publish
