@@ -60,8 +60,13 @@ def main() -> None:
         render_redirect_html(ARTIFACTHUB_URL, "Page not found"),
         encoding="utf-8",
     )
+    public_key = os.environ.get("COSIGN_PUBLIC_KEY", "").replace("\\n", "\n").strip()
+
+    if not public_key:
+        raise RuntimeError("COSIGN_PUBLIC_KEY environment variable is missing or empty")
+
     (PUBLIC_DIR / "cosign.pub").write_text(
-        (REPO_ROOT / "cosign.pub").read_text(encoding="utf-8"),
+        public_key + "\n",
         encoding="utf-8",
     )
 

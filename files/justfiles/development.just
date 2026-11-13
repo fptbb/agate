@@ -287,7 +287,9 @@ agate-malachite $action="" $image="":
 # Container Cleanup (Podman/Docker)
 [group("system")]
 agate-container-cleanup $action="":
-    #!/usr/bin/bash
+    #!/usr/bin/env bash
+    set -euo pipefail
+
     ACTION="$action"
 
     if [ -z "$ACTION" ]; then
@@ -472,7 +474,7 @@ agate-toggle-tor $action="":
 
         # Allow Tor to bind to unreserved proxy ports
         if command -v getsebool >/dev/null &&
-           getsebool tor_bind_all_unreserved_ports >/dev/null 2>&1; then
+            getsebool tor_bind_all_unreserved_ports >/dev/null 2>&1; then
 
             if [[ "$(getsebool tor_bind_all_unreserved_ports | awk '{print $3}')" != "on" ]]; then
                 echo "Configuring SELinux boolean..."

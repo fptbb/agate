@@ -194,7 +194,7 @@ agate-pgp $action="" $target="" $key="" $option="":
             printf 'GPG home: %s\n' "$(gpgconf --list-dirs homedir)"
             printf 'Agent socket: %s\n' "$(gpgconf --list-dirs agent-socket)"
             if command -v gpg-connect-agent >/dev/null 2>&1 &&
-               gpg-connect-agent /bye >/dev/null 2>&1; then
+                gpg-connect-agent /bye >/dev/null 2>&1; then
                 info 'GPG agent: reachable'
             else
                 info 'GPG agent: unavailable'

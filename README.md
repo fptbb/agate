@@ -2,7 +2,6 @@
 
 [![Build Status](https://gitlab.com/fpsys/agate/badges/main/pipeline.svg?ignore_skipped=true&key_text=CI%20Pipeline)](https://gitlab.com/fpsys/agate/-/pipelines)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate)](https://artifacthub.io/packages/search?repo=agate)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/agate-alt)](https://artifacthub.io/packages/search?repo=agate-alt)
 
 **Website:** [**os.fpt.icu**](https://os.fpt.icu)
 
@@ -103,7 +102,7 @@ Several helpers are interactive or modify system authentication, firewall rules,
 Images are signed with [cosign](https://github.com/sigstore/cosign). The public key is published at [`https://os.fpt.icu/cosign.pub`](https://os.fpt.icu/cosign.pub) and in this repository as [`cosign.pub`](cosign.pub).
 
 ```bash
-cosign verify --key cosign.pub quay.io/fpsys/agate:latest
+cosign verify --key http://os.fpt.icu/cosign.pub quay.io/fpsys/agate:latest
 ```
 
 The shared kernel arguments include `lockdown=integrity` and `sysctl.kernel.kexec_load_disabled=1`; confirm compatibility with your own hardware and workflows before deploying.
