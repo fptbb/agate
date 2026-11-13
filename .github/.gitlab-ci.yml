@@ -134,6 +134,21 @@ build-image:
         - export COSIGN_PRIVATE_KEY=$(cat .secure_files/cosign.key)
         - docker login $BB_REGISTRY -u $BB_USERNAME -p $BB_PASSWORD
     script:
+        # Restore the public signing key from GitLab CI variables
+        - |
+            set -eu
+            : "${COSIGN_PUBLIC_KEY:?COSIGN_PUBLIC_KEY is missing}"
+
+            if [ -f "$COSIGN_PUBLIC_KEY" ]; then
+                # GitLab file-type variable
+                cp "$COSIGN_PUBLIC_KEY" ./cosign.pub
+            else
+                # GitLab regular multiline variable
+                printf '%s\n' "$COSIGN_PUBLIC_KEY" > ./cosign.pub
+            fi
+
+            test -s ./cosign.pub
+            grep -q '^-----BEGIN PUBLIC KEY-----' ./cosign.pub
         - sleep 5 # delays execution to allow docker-in-docker service to start
         - echo "Pushing to $BB_REGISTRY/$BB_REGISTRY_NAMESPACE/$IMAGE_NAME"
         - |
