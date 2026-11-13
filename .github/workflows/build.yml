@@ -70,7 +70,7 @@ jobs:
               with:
                   recipe: ${{ matrix.recipe }}
                   cosign_private_key: ${{ secrets.COSIGN_SECRET_KEY }}
-                  cosign_public_key: ${{ secrets.COSIGN_PUBLIC_KEY }}
+                  cosign_public_key: ${{ vars.COSIGN_PUBLIC_KEY }}
                   registry_token: ${{ github.token }}
                   pr_event_number: ${{ github.event.number }}
                   build_opts: --build-driver=podman --run-driver=podman
