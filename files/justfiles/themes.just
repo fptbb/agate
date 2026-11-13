@@ -5,7 +5,7 @@ agate-spicetify action="":
     set -euo pipefail
     umask 077
 
-    action="{{action}}"
+    action="{{ action }}"
     spotify_id="com.spotify.Client"
     marketplace_url="https://raw.githubusercontent.com/spicetify/marketplace/main/resources/install.sh"
     config_dir="${SPICETIFY_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/spicetify}"
