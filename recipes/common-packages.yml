@@ -105,7 +105,6 @@ modules:
         - tailscaled
         - dnscrypt-proxy
         - whatpulse-pcap-service.service
-        - gpg-agent.socket
         # - me.proton.vpn.split_tunneling.service
       disabled:
         - tor.service
