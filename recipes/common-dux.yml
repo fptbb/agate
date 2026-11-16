@@ -11,26 +11,16 @@ modules:
     install:
       packages:
         - niri
-        - xwayland-satellite
         - dms
-        - alacritty
+        - xwayland-satellite
         - dux-search
-        - dux-calendar
-        - dux-files
         - cava
         - cliphist
         - wl-clipboard
         - dgop
-        - danksearch
         - matugen
         - khal
-
-        # Dux Files optional integrations: removable/network storage,
-        # sandboxed thumbnailers, and PDF thumbnails.
-        - gvfs
-        - udisks2
-        - bubblewrap
-        - poppler-utils
+        - material-symbols-fonts
 
         # System / desktop integration
         - adw-gtk3-theme
