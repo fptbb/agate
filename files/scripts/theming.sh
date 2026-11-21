@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # System-wide KDE theming for Agate's BlueBuild image.
-# Installs Catppuccin Frappe/Latte/Mocha Sapphire, Kora and PlasMusic.
+# Installs Catppuccin Frappe/Latte/Mocha Sapphire, Kora, PlasMusic and Karousel.
 # Defaults: Catppuccin Mocha Sapphire + Kora + Fox1 wallpaper.
 set -Eeuo pipefail
 
@@ -8,7 +8,7 @@ log() { printf '=== %s ===\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 [[ "$(id -u)" -eq 0 ]] || die 'Run as root (BlueBuild script module).'
-for cmd in git curl find kwriteconfig6 kpackagetool6 python3; do
+for cmd in git curl tar find kwriteconfig6 kpackagetool6 python3; do
     command -v "$cmd" >/dev/null 2>&1 || die "Missing required build command: $cmd"
 done
 
@@ -16,6 +16,7 @@ done
 CATPPUCCIN_REF="${CATPPUCCIN_REF:-main}"
 KORA_REF="${KORA_REF:-master}"
 PLASMUSIC_REF="${PLASMUSIC_REF:-main}"
+KAROUSEL_REF="${KAROUSEL_REF:-latest}"
 CATPPUCCIN_CURSORS_VERSION="${CATPPUCCIN_CURSORS_VERSION:-v2.0.0}"
 
 work="$(mktemp -d /tmp/agate-themes.XXXXXXXX)"
@@ -189,6 +190,27 @@ install -d /usr/share/plasma/plasmoids
 rm -rf -- "/usr/share/plasma/plasmoids/$plugin_id"
 cp -a "$plasmusic_src" "/usr/share/plasma/plasmoids/$plugin_id"
 
+log 'Installing Karousel KWin script system-wide'
+karousel_dest="/usr/share/kwin/scripts/karousel"
+karousel_extract="$work/karousel-extract"
+mkdir -p "$karousel_extract"
+if [[ "$KAROUSEL_REF" == "latest" ]]; then
+    karousel_tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+        'https://github.com/peterfajdiga/karousel/releases/latest' | awk -F'/' '{print $NF}')"
+else
+    karousel_tag="$KAROUSEL_REF"
+fi
+karousel_archive="$work/karousel-${karousel_tag}.tar.gz"
+curl --fail --location --silent --show-error --retry 3 \
+    --output "$karousel_archive" \
+    "https://github.com/peterfajdiga/karousel/releases/download/${karousel_tag}/karousel_${karousel_tag}.tar.gz"
+tar -xzf "$karousel_archive" -C "$karousel_extract" --strip-components=1
+[[ -f "$karousel_extract/metadata.json" ]] || die 'Karousel metadata.json missing'
+install -d /usr/share/kwin/scripts
+rm -rf -- "$karousel_dest"
+cp -a "$karousel_extract" "$karousel_dest"
+log "Installed Karousel ($karousel_tag) to $karousel_dest"
+
 log 'Configuring Agate wallpaper packages and desktop defaults'
 # Fix metadata only for wallpapers supplied by Agate, not base-image packages.
 for package in "$assets_dir/wallpapers"/*/; do
@@ -235,4 +257,4 @@ kwriteconfig6 --file /etc/xdg/kdeglobals \
 kwriteconfig6 --file /etc/xdg/kcminputrc \
     --group Mouse --key cursorTheme catppuccin-mocha-sapphire-cursors
 
-log 'Agate theming complete: Mocha Sapphire + Kora + Fox1; Frappe/Latte, PlasMusic and assets installed'
+log 'Agate theming complete: Mocha Sapphire + Kora + Fox1; Frappe/Latte, PlasMusic, Karousel and assets installed'
