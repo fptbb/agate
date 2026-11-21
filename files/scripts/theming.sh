@@ -195,20 +195,25 @@ karousel_dest="/usr/share/kwin/scripts/karousel"
 karousel_extract="$work/karousel-extract"
 mkdir -p "$karousel_extract"
 if [[ "$KAROUSEL_REF" == "latest" ]]; then
-    karousel_tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
-        'https://github.com/peterfajdiga/karousel/releases/latest' | awk -F'/' '{print $NF}')"
+    karousel_url="$(curl --fail --location --silent --show-error --retry 3 --head \
+        --output /dev/null --write-out '%{url_effective}' \
+        'https://github.com/peterfajdiga/karousel/releases/latest')"
+    karousel_tag="${karousel_url##*/}"
 else
     karousel_tag="$KAROUSEL_REF"
 fi
-karousel_archive="$work/karousel-${karousel_tag}.tar.gz"
+# upstream release assets drop the leading 'v' and use underscores (e.g. karousel_0_18.tar.gz)
+karousel_ver="${karousel_tag#v}"
+karousel_asset="karousel_${karousel_ver//./_}.tar.gz"
+karousel_archive="$work/${karousel_asset}"
 curl --fail --location --silent --show-error --retry 3 \
     --output "$karousel_archive" \
-    "https://github.com/peterfajdiga/karousel/releases/download/${karousel_tag}/karousel_${karousel_tag}.tar.gz"
-tar -xzf "$karousel_archive" -C "$karousel_extract" --strip-components=1
-[[ -f "$karousel_extract/metadata.json" ]] || die 'Karousel metadata.json missing'
+    "https://github.com/peterfajdiga/karousel/releases/download/${karousel_tag}/${karousel_asset}"
+tar -xzf "$karousel_archive" -C "$karousel_extract"
+[[ -f "$karousel_extract/karousel/metadata.json" ]] || die 'Karousel metadata.json missing'
 install -d /usr/share/kwin/scripts
 rm -rf -- "$karousel_dest"
-cp -a "$karousel_extract" "$karousel_dest"
+cp -a "$karousel_extract/karousel" "$karousel_dest"
 log "Installed Karousel ($karousel_tag) to $karousel_dest"
 
 log 'Configuring Agate wallpaper packages and desktop defaults'
