@@ -1,0 +1,16 @@
+[
+  {
+    "filename": "zoomin-00.svg",
+    "hotspot_x": 4,
+    "hotspot_y": 13,
+    "nominal_size": 32,
+    "delay": 500
+  },
+  {
+    "filename": "zoomin-01.svg",
+    "hotspot_x": 4,
+    "hotspot_y": 13,
+    "nominal_size": 32,
+    "delay": 500
+  }
+]

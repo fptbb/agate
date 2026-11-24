@@ -1,0 +1,30 @@
+[
+  {
+    "filename": "pointlaugh-00.svg",
+    "hotspot_x": 3,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 240
+  },
+  {
+    "filename": "pointlaugh-01.svg",
+    "hotspot_x": 3,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 240
+  },
+  {
+    "filename": "pointlaugh-02.svg",
+    "hotspot_x": 3,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 240
+  },
+  {
+    "filename": "pointlaugh-03.svg",
+    "hotspot_x": 3,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 240
+  }
+]

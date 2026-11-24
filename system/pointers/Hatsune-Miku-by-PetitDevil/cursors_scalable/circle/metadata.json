@@ -1,0 +1,23 @@
+[
+  {
+    "filename": "circle-00.svg",
+    "hotspot_x": 12,
+    "hotspot_y": 12,
+    "nominal_size": 32,
+    "delay": 399
+  },
+  {
+    "filename": "circle-01.svg",
+    "hotspot_x": 12,
+    "hotspot_y": 12,
+    "nominal_size": 32,
+    "delay": 133
+  },
+  {
+    "filename": "circle-00.svg",
+    "hotspot_x": 12,
+    "hotspot_y": 12,
+    "nominal_size": 32,
+    "delay": 665
+  }
+]

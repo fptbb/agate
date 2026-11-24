@@ -1,0 +1,23 @@
+[
+  {
+    "filename": "dnd-ask-00.svg",
+    "hotspot_x": 7,
+    "hotspot_y": 3,
+    "nominal_size": 32,
+    "delay": 498
+  },
+  {
+    "filename": "dnd-ask-01.svg",
+    "hotspot_x": 7,
+    "hotspot_y": 3,
+    "nominal_size": 32,
+    "delay": 166
+  },
+  {
+    "filename": "dnd-ask-00.svg",
+    "hotspot_x": 7,
+    "hotspot_y": 3,
+    "nominal_size": 32,
+    "delay": 664
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "filename": "resize-v-00.svg",
+    "hotspot_x": 3,
+    "hotspot_y": 8,
+    "nominal_size": 32,
+    "delay": 400
+  },
+  {
+    "filename": "resize-v-01.svg",
+    "hotspot_x": 3,
+    "hotspot_y": 8,
+    "nominal_size": 32,
+    "delay": 400
+  }
+]

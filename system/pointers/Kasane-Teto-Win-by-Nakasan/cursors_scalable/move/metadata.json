@@ -1,0 +1,16 @@
+[
+  {
+    "filename": "move-00.svg",
+    "hotspot_x": 10,
+    "hotspot_y": 10,
+    "nominal_size": 32,
+    "delay": 500
+  },
+  {
+    "filename": "move-01.svg",
+    "hotspot_x": 10,
+    "hotspot_y": 10,
+    "nominal_size": 32,
+    "delay": 500
+  }
+]

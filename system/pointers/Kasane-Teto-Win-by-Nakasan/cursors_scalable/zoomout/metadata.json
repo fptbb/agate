@@ -1,0 +1,16 @@
+[
+  {
+    "filename": "zoomout-00.svg",
+    "hotspot_x": 4,
+    "hotspot_y": 13,
+    "nominal_size": 32,
+    "delay": 500
+  },
+  {
+    "filename": "zoomout-01.svg",
+    "hotspot_x": 4,
+    "hotspot_y": 13,
+    "nominal_size": 32,
+    "delay": 500
+  }
+]

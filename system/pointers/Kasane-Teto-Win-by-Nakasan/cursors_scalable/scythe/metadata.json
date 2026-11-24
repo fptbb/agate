@@ -1,0 +1,30 @@
+[
+  {
+    "filename": "scythe-00.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 500
+  },
+  {
+    "filename": "scythe-01.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 500
+  },
+  {
+    "filename": "scythe-02.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 500
+  },
+  {
+    "filename": "scythe-03.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 500
+  }
+]

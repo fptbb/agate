@@ -1,0 +1,30 @@
+[
+  {
+    "filename": "default-00.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 400
+  },
+  {
+    "filename": "default-01.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 400
+  },
+  {
+    "filename": "default-02.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 400
+  },
+  {
+    "filename": "default-03.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 400
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "filename": "no-drop-00.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 399
+  },
+  {
+    "filename": "no-drop-01.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 133
+  },
+  {
+    "filename": "no-drop-00.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 665
+  }
+]

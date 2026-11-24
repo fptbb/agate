@@ -1,0 +1,23 @@
+[
+  {
+    "filename": "zoom-in-00.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 498
+  },
+  {
+    "filename": "zoom-in-01.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 166
+  },
+  {
+    "filename": "zoom-in-00.svg",
+    "hotspot_x": 0,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 664
+  }
+]

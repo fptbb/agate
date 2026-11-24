@@ -1,0 +1,23 @@
+[
+  {
+    "filename": "openhand-00.svg",
+    "hotspot_x": 7,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 448
+  },
+  {
+    "filename": "openhand-01.svg",
+    "hotspot_x": 7,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 166
+  },
+  {
+    "filename": "openhand-00.svg",
+    "hotspot_x": 7,
+    "hotspot_y": 0,
+    "nominal_size": 32,
+    "delay": 614
+  }
+]
