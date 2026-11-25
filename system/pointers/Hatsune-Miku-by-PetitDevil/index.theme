@@ -1,5 +1,5 @@
 [Icon Theme]
 Name=Hatsune Miku (by PetitDevil)
-Comment=Hatsune Miku animated cursor theme by petit devil, ported by supermariofps
-Author=petit devil (ぷちでびる) & supermariofps
+Comment=Hatsune Miku animated cursor theme by petit devil (petitcan.blog.shinobi.jp), Linux port by supermariofps, modern Linux fixes by fptbb
+Author=petit devil (ぷちでびる), Linux port by supermariofps; modern Linux fixes by fptbb (https://fptbb.com/)
 Inherits=breeze_cursors,Adwaita,default

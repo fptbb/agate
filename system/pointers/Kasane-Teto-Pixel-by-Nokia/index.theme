@@ -1,5 +1,5 @@
 [Icon Theme]
 Name=Kasane Teto (Pixel by Nokia)
-Comment=Kasane Teto animated pixel art cursor theme by Nokia_yan (pixels2svg scalable)
-Author=Nokia_yan (дынядрочер)
+Comment=Kasane Teto Pixel animated cursor theme by Nokia_yan (ko-fi.com/nokia_yan/shop), modern Linux scalable build by fptbb
+Author=Nokia_yan; modern Linux port/fixes by fptbb (https://fptbb.com/); Kasane Teto by Sen & Mayo Oyamano / TWINDRILL
 Inherits=breeze_cursors,Adwaita,default

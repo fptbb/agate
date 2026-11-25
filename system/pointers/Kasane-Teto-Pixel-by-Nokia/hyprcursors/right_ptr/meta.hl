@@ -1,0 +1,13 @@
+# Derived (flip_h) for Hyprland: right_ptr from left_ptr
+resize_algorithm = nearest
+hotspot_x = 0.96875
+hotspot_y = 0.00000
+
+define_size = 0, right_ptr-00.svg, 83
+define_size = 0, right_ptr-01.svg, 83
+define_size = 0, right_ptr-02.svg, 83
+define_size = 0, right_ptr-03.svg, 83
+define_size = 0, right_ptr-04.svg, 83
+define_size = 0, right_ptr-05.svg, 83
+define_size = 0, right_ptr-06.svg, 83
+define_size = 0, right_ptr-07.svg, 83

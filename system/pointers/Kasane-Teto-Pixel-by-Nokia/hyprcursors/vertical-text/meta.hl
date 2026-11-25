@@ -1,0 +1,13 @@
+# Derived (rotate90) for Hyprland: vertical-text from xterm
+resize_algorithm = nearest
+hotspot_x = 0.68750
+hotspot_y = 0.12500
+
+define_size = 0, vertical-text-00.svg, 83
+define_size = 0, vertical-text-01.svg, 83
+define_size = 0, vertical-text-02.svg, 83
+define_size = 0, vertical-text-03.svg, 83
+define_size = 0, vertical-text-04.svg, 83
+define_size = 0, vertical-text-05.svg, 83
+define_size = 0, vertical-text-06.svg, 83
+define_size = 0, vertical-text-07.svg, 83

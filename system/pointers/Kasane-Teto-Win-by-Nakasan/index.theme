@@ -1,5 +1,5 @@
 [Icon Theme]
 Name=Kasane Teto (Win by Nakasan)
-Comment=Kasane Teto Windows animated cursor theme by Nakasan (@twindrills), ported by @kichikuout
-Author=Nakasan (なかさん) & kichikuout
+Comment=Kasane Teto Windows animated cursor theme by Nakasan (nicovideo.jp/watch/sm10210300), ported by kichikuout, modern Linux fixes by fptbb
+Author=Nakasan (なかさん), ported by kichikuout; modern Linux fixes by fptbb (https://fptbb.com/); Kasane Teto by Sen & Mayo Oyamano / TWINDRILL
 Inherits=breeze_cursors,Adwaita,default
