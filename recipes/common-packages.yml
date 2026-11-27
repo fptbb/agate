@@ -54,6 +54,7 @@ modules:
       cleanup: true
       copr:
         - fptbb/packages
+        - fptbb/random
         - bigjapka/VeraCrypt
       files:
         - nordvpn.repo
@@ -70,6 +71,9 @@ modules:
         - fp-appimage-updater # declarative appimage updater
         - fp-dotfiles-manager # manage dotfiles with style
         - fp-no-dash # personal web dashboard and launcher
+
+        # Packages I made myself (fptbb/random) to style the system
+        - kiri
 
         # Networking & VPNs
         - nordvpn # nordvpn's cli client for linux
