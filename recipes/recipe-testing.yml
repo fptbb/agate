@@ -4,7 +4,7 @@ name: agate
 description: A custom image of Bazzite for personal needs.
 
 base-image: ghcr.io/ublue-os/bazzite-nvidia-open
-image-version: testing
+image-version: "45.20261117"
 alt-tags:
   - testing
 
